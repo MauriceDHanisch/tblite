@@ -33,6 +33,8 @@ module tblite_results
       real(wp), allocatable :: overlap(:, :)
       !> (Core) Hamiltonian integrals
       real(wp), allocatable :: hamiltonian(:, :)
+      !> Overlap matrix gradient (optional, shape: nao, nao, nat, 3)
+      real(wp), allocatable :: overlap_matrix_gradient(:, :, :, :)
       !> Hamiltonian matrix gradient (optional, shape: nao, nao, nat, 3)
       real(wp), allocatable :: hamiltonian_matrix_gradient(:, :, :, :)
       type(double_dictionary_type), allocatable :: dict

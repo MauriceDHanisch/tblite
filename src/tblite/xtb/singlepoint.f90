@@ -42,7 +42,8 @@ module tblite_xtb_singlepoint
       & magnet_to_updown, updown_to_magnet
    use tblite_xtb_calculator, only : xtb_calculator
    use tblite_xtb_h0, only : get_selfenergy, get_hamiltonian, get_occupation, &
-      & get_hamiltonian_gradient, get_hamiltonian_matrix_gradient
+      & get_hamiltonian_gradient, get_hamiltonian_matrix_gradient, &
+      & get_overlap_matrix_gradient
    use tblite_post_processing_type, only : collect_containers_caches
    use tblite_post_processing_list, only : post_processing_list
    implicit none
@@ -69,7 +70,7 @@ contains
 
 !> Entry point for performing single point calculation using the xTB calculator
 subroutine xtb_singlepoint(ctx, mol, calc, wfn, accuracy, energy, gradient, sigma, &
-      & verbosity, results, post_process, save_hamiltonian_matrix_gradient)
+      & verbosity, results, post_process, save_hamiltonian_matrix_gradient, save_overlap_matrix_gradient)
    !> Calculation context
    type(context_type), intent(inout) :: ctx
    !> Molecular structure data
@@ -93,8 +94,10 @@ subroutine xtb_singlepoint(ctx, mol, calc, wfn, accuracy, energy, gradient, sigm
    type(post_processing_list), intent(inout), optional :: post_process
    !> Flag to save hamiltonian matrix gradient
    logical, intent(in), optional :: save_hamiltonian_matrix_gradient
+   !> Flag to save overlap matrix gradient
+   logical, intent(in), optional :: save_overlap_matrix_gradient
    
-   logical :: grad, converged, econverged, pconverged, save_hgrad
+   logical :: grad, converged, econverged, pconverged, save_hgrad, save_sgrad
    integer :: prlevel
    real(wp) :: econv, pconv, cutoff, elast, nel
    real(wp), allocatable :: energies(:), edisp(:), erep(:), exbond(:), eint(:), eelec(:)
@@ -126,6 +129,7 @@ subroutine xtb_singlepoint(ctx, mol, calc, wfn, accuracy, energy, gradient, sigm
 
    grad = present(gradient) .and. present(sigma)
    save_hgrad = present(save_hamiltonian_matrix_gradient) .and. save_hamiltonian_matrix_gradient
+   save_sgrad = present(save_overlap_matrix_gradient) .and. save_overlap_matrix_gradient
 
    allocate(energies(mol%nat), source=0.0_wp)
    allocate(erep(mol%nat), source=0.0_wp)
@@ -322,10 +326,15 @@ subroutine xtb_singlepoint(ctx, mol, calc, wfn, accuracy, energy, gradient, sigm
       call get_hamiltonian_gradient(mol, lattr, list, calc%bas, calc%h0, selfenergy, &
          & dsedcn, pot, wfn%density, wdensity, dEdcn, gradient, sigma)
       
-      ! Store hamiltonian matrix gradient if requested
-      if (save_hgrad .and. present(results)) then
-         call get_hamiltonian_matrix_gradient(mol, lattr, list, calc%bas, calc%h0, selfenergy, &
-            & results%hamiltonian_matrix_gradient)
+      ! Store overlap and hamiltonian matrix gradients if requested
+      if (present(results)) then
+         if (save_sgrad) then
+            call get_overlap_matrix_gradient(mol, lattr, list, calc%bas, results%overlap_matrix_gradient)
+         end if
+         if (save_hgrad) then
+            call get_hamiltonian_matrix_gradient(mol, lattr, list, calc%bas, calc%h0, selfenergy, &
+               & results%hamiltonian_matrix_gradient)
+         end if
       end if
       
       call magnet_to_updown(wfn%density)

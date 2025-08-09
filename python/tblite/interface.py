@@ -244,6 +244,7 @@ class Result:
         "orbital-coefficients": library.get_orbital_coefficients,
         "density-matrix": library.get_density_matrix,
         "overlap-matrix": library.get_overlap_matrix,
+        "overlap-matrix-gradient": library.get_overlap_matrix_gradient,
         "hamiltonian-matrix": library.get_hamiltonian_matrix,
         "hamiltonian-matrix-gradient": library.get_hamiltonian_matrix_gradient,
         "post-processing-dict": library.get_post_processing_dict,
@@ -282,8 +283,9 @@ class Result:
          orbital-occupations    norb [2, norb]                    e
          orbital-coefficients   norb, norb [2, norb, norb]        unitless
          overlap-matrix         norb, norb                        unitless
+         overlap-matrix-gradient  norb, norb, nat, 3              unitless
          hamiltonian-matrix     norb, norb                        Hartree
-         hamiltonian-matrix-gradient   norb, norb, nat, 3                 Hartree/Bohr
+         hamiltonian-matrix-gradient   norb, norb, nat, 3         Hartree/Bohr
          density-matrix         norb, norb [2, norb, norb]        e
          natoms                 scalar                            unitless
          norbitals              scalar                            unitless
@@ -484,6 +486,7 @@ class Calculator(Structure):
         "mixer-damping": library.set_calculator_mixer_damping,
         "save-integrals": library.set_calculator_save_integrals,
         "save-hamiltonian-matrix-gradient": library.set_calculator_save_hamiltonian_matrix_gradient,
+        "save-overlap-matrix-gradient": library.set_calculator_save_overlap_matrix_gradient,
         "temperature": library.set_calculator_temperature,
         "verbosity": library.set_calculator_verbosity,
     }
