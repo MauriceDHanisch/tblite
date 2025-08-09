@@ -33,6 +33,8 @@ module tblite_results
       real(wp), allocatable :: overlap(:, :)
       !> (Core) Hamiltonian integrals
       real(wp), allocatable :: hamiltonian(:, :)
+      !> Fock matrix (spin-resolved: nspin, nao, nao)
+      real(wp), allocatable :: fock(:, :, :)
       !> Overlap matrix gradient (optional, shape: nao, nao, nat, 3)
       real(wp), allocatable :: overlap_matrix_gradient(:, :, :, :)
       !> Hamiltonian matrix gradient (optional, shape: nao, nao, nat, 3)

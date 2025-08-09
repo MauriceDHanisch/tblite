@@ -384,6 +384,9 @@ get_overlap_matrix = _get_ao_matrix(lib.tblite_get_result_overlap_matrix, False)
 get_hamiltonian_matrix = _get_ao_matrix(
     lib.tblite_get_result_hamiltonian_matrix, False
 )
+get_fock_matrix = _get_ao_matrix(
+    lib.tblite_get_result_fock_matrix, True
+)
 
 
 def _delete_calculator(calc) -> None:

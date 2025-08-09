@@ -247,6 +247,7 @@ class Result:
         "overlap-matrix-gradient": library.get_overlap_matrix_gradient,
         "hamiltonian-matrix": library.get_hamiltonian_matrix,
         "hamiltonian-matrix-gradient": library.get_hamiltonian_matrix_gradient,
+        "fock-matrix": library.get_fock_matrix,
         "post-processing-dict": library.get_post_processing_dict,
         "natoms": library.get_number_of_atoms,
         "norbitals": library.get_number_of_orbitals,

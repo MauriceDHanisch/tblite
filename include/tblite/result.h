@@ -235,6 +235,16 @@ tblite_get_result_hamiltonian_matrix(tblite_error error,
                                      tblite_result res,
                                      double* hmat);
 
+/// Retrieve Fock matrix from result container
+///
+/// @param error: Handle for error messages
+/// @param res: Result container
+/// @param fmat: Fock matrix, shape [nspin][nao][nao]
+TBLITE_API_ENTRY void TBLITE_API_CALL
+tblite_get_result_fock_matrix(tblite_error error,
+                              tblite_result res,
+                              double* fmat);
+
 /// Retrieve Hamiltonian matrix gradient from result container
 ///
 /// @param error: Handle for error messages

@@ -27,6 +27,7 @@ module tblite_api_result
    use tblite_results, only : results_type
    use tblite_wavefunction_type, only : wavefunction_type
    use tblite_wavefunction_restart, only : load_wavefunction, save_wavefunction
+   use tblite_blas, only : gemm
    use tblite_api_double_dictionary, only : vp_double_dictionary
    implicit none
    private
@@ -39,7 +40,8 @@ module tblite_api_result
       & get_result_orbital_energies_api, get_result_orbital_occupations_api, &
       & get_result_orbital_coefficients_api, get_result_energies_api, &
        & get_result_density_matrix_api, get_result_overlap_matrix_api, &
-       & get_result_hamiltonian_matrix_api, get_result_hamiltonian_matrix_gradient_api, &
+      & get_result_hamiltonian_matrix_api, get_result_fock_matrix_api, &
+      & get_result_hamiltonian_matrix_gradient_api, &
        & get_result_overlap_matrix_gradient_api, &
       & get_result_bond_orders_api, get_post_processing_dict_api
 
@@ -63,6 +65,35 @@ module tblite_api_result
 
 
 contains
+subroutine build_fock_from_mo(smat, cmo, emo, fock)
+   real(wp), intent(in) :: smat(:, :)
+   real(wp), intent(in) :: cmo(:, :)
+   real(wp), intent(in) :: emo(:)
+   real(wp), intent(out) :: fock(:, :)
+   real(wp), allocatable :: ce(:, :), tmp(:, :), tmp2(:, :)
+   integer :: norb
+   norb = size(cmo, 1)
+   allocate(ce(norb, norb), tmp(norb, norb), tmp2(norb, norb))
+   ce = 0.0_wp; tmp = 0.0_wp; tmp2 = 0.0_wp; fock = 0.0_wp
+   ! ce = C * diag(E)
+   call scale_columns(cmo, emo, ce)
+   ! Using S-orthonormality (C^T S C = I): C^{-1} = C^T S
+   ! So F = S * C * diag(E) * C^T * S
+   call gemm(ce, cmo, tmp, transb='t')   ! tmp = C * diag(E) * C^T
+   call gemm(smat, tmp, tmp2)            ! tmp2 = S * tmp
+   call gemm(tmp2, smat, fock)           ! fock = tmp2 * S
+end subroutine build_fock_from_mo
+
+subroutine scale_columns(cmo, diagv, out)
+   real(wp), intent(in) :: cmo(:, :)
+   real(wp), intent(in) :: diagv(:)
+   real(wp), intent(out) :: out(:, :)
+   integer :: i
+   out = cmo
+   do i = 1, size(out, 2)
+      out(:, i) = out(:, i) * diagv(i)
+   end do
+end subroutine scale_columns
 
 
 !> Create new result container
@@ -537,6 +568,46 @@ subroutine get_result_hamiltonian_matrix_api(verror, vres, hmat) &
    hmat(:size(res%results%hamiltonian)) = &
       & reshape(res%results%hamiltonian, [size(res%results%hamiltonian)])
 end subroutine get_result_hamiltonian_matrix_api
+
+subroutine get_result_fock_matrix_api(verror, vres, fmat) &
+      & bind(C, name=namespace//"get_result_fock_matrix")
+   type(c_ptr), value :: verror
+   type(vp_error), pointer :: error
+   type(c_ptr), value :: vres
+   type(vp_result), pointer :: res
+   real(c_double), intent(out) :: fmat(*)
+   logical :: ok
+
+   if (debug) print '("[Info]", 1x, a)', "get_result_fock_matrix"
+
+   call get_result(verror, vres, error, res, ok)
+   if (.not.ok) return
+
+   if (.not.allocated(res%wfn)) then
+      call fatal_error(error%ptr, "Result does not contain wavefunction")
+      return
+   end if
+
+   ! Fock in AO basis reconstructed as F = S C E C^{-1} for each spin
+   ! We follow the exposure pattern of density/orbitals: pack per spin
+   if (.not.allocated(res%results%overlap)) then
+      call fatal_error(error%ptr, "Result does not contain overlap matrix; enable save-integrals")
+      return
+   end if
+
+   block
+      integer :: norb, nspin, s
+      real(wp), allocatable :: fock(:, :, :)
+      norb = size(res%wfn%coeff, 1)
+      nspin = size(res%wfn%coeff, 3)
+      allocate(fock(norb, norb, nspin))
+      fock = 0.0_wp
+      do s = 1, nspin
+         call build_fock_from_mo(res%results%overlap, res%wfn%coeff(:, :, s), res%wfn%emo(:, s), fock(:, :, s))
+      end do
+      fmat(:size(fock)) = reshape(fock, [size(fock)])
+   end block
+end subroutine get_result_fock_matrix_api
 
 subroutine get_result_overlap_matrix_gradient_api(verror, vres, smatgrad, nao, nat) &
       & bind(C, name=namespace//"get_result_overlap_matrix_gradient")

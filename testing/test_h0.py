@@ -1,5 +1,6 @@
 import numpy as np
 from tblite.interface import Calculator
+from tqdm import tqdm
 
 def compute_H(numbers, positions):
     calc = Calculator(method="GFN1-xTB", numbers=numbers, positions=positions)
@@ -14,7 +15,7 @@ def finite_diff_H(numbers, positions, h=1e-2):
     nat = positions.shape[0]
     dH_num = np.zeros((nao, nao, nat, 3), dtype=float)
 
-    for a in range(nat):
+    for a in tqdm(range(nat), desc="Displacing atoms"):
         for ax in range(3):
             pos = positions.copy()
 
@@ -47,7 +48,7 @@ positions = np.array([
                 [+5.89039325714111, +0.02589114569128, 0.00000000000000],
                 [-2.74426102638245, +2.16115570068359, 0.00000000000000],
                 [+2.74426102638245, -2.16115570068359, 0.00000000000000],
-                ]) # ** to use dd as kwargs
+                ]) 
 
 
 calc = Calculator(method="GFN1-xTB", numbers=numbers, positions=positions)
@@ -60,7 +61,7 @@ H  = res.get("hamiltonian-matrix")
 dH = res.get("hamiltonian-matrix-gradient")  # (nao, nao, nat, 3)
 
 # --- numerical check ---
-h = 1e-2  # displacement in same unit as `positions`
+h = 1e-3  # displacement in same unit as `positions`
 dH_num = finite_diff_H(numbers, positions, h=h)
 
 # diagnostics
