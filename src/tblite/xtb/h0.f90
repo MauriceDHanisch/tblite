@@ -30,7 +30,8 @@ module tblite_xtb_h0
    private
 
    public ::  new_hamiltonian
-   public :: get_selfenergy, get_hamiltonian, get_occupation, get_hamiltonian_gradient
+   public :: get_selfenergy, get_hamiltonian, get_occupation, get_hamiltonian_gradient, &
+      & get_hamiltonian_matrix_gradient
 
 
    type, public :: tb_hamiltonian
@@ -476,6 +477,120 @@ subroutine get_hamiltonian_gradient(mol, trans, list, bas, h0, selfenergy, dsedc
    end do
 
 end subroutine get_hamiltonian_gradient
+
+
+!> Compute the gradient of the core hamiltonian matrix with respect to nuclear positions
+subroutine get_hamiltonian_matrix_gradient(mol, trans, list, bas, h0, selfenergy, dH_dR)
+   use mctc_env, only : wp
+   use mctc_io, only : structure_type
+   use tblite_adjlist, only : adjacency_list
+   use tblite_basis_type, only : basis_type
+   implicit none
+
+   !> Molecular structure data
+   type(structure_type), intent(in) :: mol
+   !> Lattice points within a given realspace cutoff
+   real(wp), intent(in) :: trans(:, :)
+   !> Neighbour list
+   type(adjacency_list), intent(in) :: list
+   !> Basis set information
+   type(basis_type), intent(in) :: bas
+   !> Hamiltonian interaction data
+   type(tb_hamiltonian), intent(in) :: h0
+   !> Diagonal elements of the Hamiltonian
+   real(wp), intent(in) :: selfenergy(:)
+   !> Gradient of the core hamiltonian matrix
+   real(wp), intent(out), allocatable :: dH_dR(:, :, :, :)
+
+   integer :: iat, jat, izp, jzp, itr, img, inl
+   integer :: ish, jsh, is, js, ii, jj, iao, jao, nao, ij
+   integer :: nat, nao_tot
+   real(wp) :: rr, r2, vec(3), hij, hscale, hs
+   real(wp) :: shpolyi, shpolyj, shpoly, dshpoly, dsv(3)
+   real(wp), allocatable :: stmp(:), dtmp(:, :), qtmp(:, :)
+   real(wp), allocatable :: dstmp(:, :), ddtmpi(:, :, :), dqtmpi(:, :, :)
+   real(wp), allocatable :: ddtmpj(:, :, :), dqtmpj(:, :, :)
+
+   nat = mol%nat
+   nao_tot = bas%nao
+
+   allocate(dH_dR(nao_tot, nao_tot, nat, 3))
+   dH_dR = 0.0_wp
+
+   allocate(stmp(msao(bas%maxl)**2), dstmp(3, msao(bas%maxl)**2), &
+      & dtmp(3, msao(bas%maxl)**2), ddtmpi(3, 3, msao(bas%maxl)**2), &
+      & qtmp(6, msao(bas%maxl)**2), dqtmpi(3, 6, msao(bas%maxl)**2), &
+      & ddtmpj(3, 3, msao(bas%maxl)**2), dqtmpj(3, 6, msao(bas%maxl)**2))
+
+   !$omp parallel do schedule(runtime) default(none) &
+   !$omp shared(mol, bas, trans, list, h0, selfenergy, dH_dR) &
+   !$omp private(iat, jat, izp, jzp, itr, is, js, ish, jsh, ii, jj, iao, jao, nao, ij) &
+   !$omp private(r2, vec, stmp, dtmp, qtmp, dstmp, ddtmpi, dqtmpi, ddtmpj, dqtmpj) &
+   !$omp private(rr, shpolyi, shpolyj, shpoly, dshpoly, dsv, hscale, hs, hij, img, inl)
+   do iat = 1, mol%nat
+      izp = mol%id(iat)
+      is = bas%ish_at(iat)
+      inl = list%inl(iat)
+      do img = 1, list%nnl(iat)
+         jat = list%nlat(img+inl)
+         itr = list%nltr(img+inl)
+         jzp = mol%id(jat)
+         js = bas%ish_at(jat)
+
+         if (iat == jat) cycle
+
+         vec(:) = mol%xyz(:, iat) - mol%xyz(:, jat) - trans(:, itr)
+         r2 = vec(1)**2 + vec(2)**2 + vec(3)**2
+         rr = sqrt(sqrt(r2) / (h0%rad(jzp) + h0%rad(izp)))
+
+         do ish = 1, bas%nsh_id(izp)
+            ii = bas%iao_sh(is+ish)
+            do jsh = 1, bas%nsh_id(jzp)
+               jj = bas%iao_sh(js+jsh)
+
+               call multipole_grad_cgto(bas%cgto(jsh, jzp), bas%cgto(ish, izp), &
+                  & r2, vec, bas%intcut, stmp, dtmp, qtmp, dstmp, ddtmpj, dqtmpj, &
+                  & ddtmpi, dqtmpi)
+
+               shpolyi = 1.0_wp + h0%shpoly(ish, izp)*rr
+               shpolyj = 1.0_wp + h0%shpoly(jsh, jzp)*rr
+               shpoly = shpolyi * shpolyj
+               dshpoly = (shpolyi * h0%shpoly(jsh, jzp) + shpolyj * &
+                  & h0%shpoly(ish, izp)) * 0.5_wp * rr / r2
+               dsv(:) = dshpoly / shpoly * vec
+
+               hscale = h0%hscale(jsh, ish, jzp, izp)
+               hs = hscale * shpoly
+               hij = 0.5_wp * (selfenergy(is+ish) + selfenergy(js+jsh)) * hs
+
+               nao = msao(bas%cgto(jsh, jzp)%ang)
+               do iao = 1, msao(bas%cgto(ish, izp)%ang)
+                  do jao = 1, nao
+                     ij = jao + nao*(iao-1)
+
+                     ! d/dR_iat H(jj+jao, ii+iao)
+                     dH_dR(jj+jao, ii+iao, iat, :) = dH_dR(jj+jao, ii+iao, iat, :) &
+                        + hij * (dstmp(:, ij) + stmp(ij) * dsv(:))
+
+                     ! d/dR_jat H(jj+jao, ii+iao) = - d/dR_iat H(jj+jao, ii+iao)
+                     dH_dR(jj+jao, ii+iao, jat, :) = dH_dR(jj+jao, ii+iao, jat, :) &
+                        - hij * (dstmp(:, ij) + stmp(ij) * dsv(:))
+
+                     ! Enforce symmetry for the transposed element
+                     dH_dR(ii+iao, jj+jao, iat, :) = dH_dR(ii+iao, jj+jao, iat, :) &
+                        + hij * (dstmp(:, ij) + stmp(ij) * dsv(:))
+                     dH_dR(ii+iao, jj+jao, jat, :) = dH_dR(ii+iao, jj+jao, jat, :) &
+                        - hij * (dstmp(:, ij) + stmp(ij) * dsv(:))
+                  end do
+               end do
+
+            end do
+         end do
+
+      end do
+   end do
+
+end subroutine get_hamiltonian_matrix_gradient
 
 
 subroutine get_occupation(mol, bas, h0, nocc, n0at, n0sh)

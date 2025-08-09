@@ -46,7 +46,7 @@ module tblite_api_calculator
       & new_xtb_calculator_api
    public :: set_calculator_mixer_damping_api, set_calculator_max_iter_api, &
       & set_calculator_accuracy_api, set_calculator_temperature_api, &
-      & set_calculator_save_integrals_api
+      & set_calculator_save_integrals_api, set_calculator_save_hamiltonian_matrix_gradient_api
    public :: get_singlepoint_api
    public :: push_back_post_processing_param_api, push_back_post_processing_str_api
 
@@ -70,6 +70,8 @@ module tblite_api_calculator
       integer :: guess = tblite_guess_sad
       !> Numbers of spin channels for calculator
       integer :: nspin = 1
+      !> Flag to save hamiltonian matrix gradient
+      logical :: save_hamiltonian_matrix_gradient = .false.
       type(post_processing_list) :: post_proc
    end type vp_calculator
 
@@ -379,6 +381,31 @@ subroutine set_calculator_save_integrals_api(vctx, vcalc, save_integrals) &
    calc%ptr%save_integrals = save_integrals /= 0
 end subroutine set_calculator_save_integrals_api
 
+
+subroutine set_calculator_save_hamiltonian_matrix_gradient_api(vctx, vcalc, save_hamiltonian_matrix_gradient) &
+      & bind(C, name=namespace//"set_calculator_save_hamiltonian_matrix_gradient")
+   type(c_ptr), value :: vctx
+   type(vp_context), pointer :: ctx
+   type(c_ptr), value :: vcalc
+   type(vp_calculator), pointer :: calc
+   integer(c_int), value :: save_hamiltonian_matrix_gradient
+   type(error_type), allocatable :: error
+
+   if (debug) print '("[Info]", 1x, a)', "set_calculator_save_hamiltonian_matrix_gradient"
+
+   if (.not.c_associated(vctx)) return
+   call c_f_pointer(vctx, ctx)
+
+   if (.not.c_associated(vcalc)) then
+      call fatal_error(error, "Calculator object is missing")
+      call ctx%ptr%set_error(error)
+      return
+   end if
+   call c_f_pointer(vcalc, calc)
+
+   calc%save_hamiltonian_matrix_gradient = save_hamiltonian_matrix_gradient /= 0
+end subroutine set_calculator_save_hamiltonian_matrix_gradient_api
+
 subroutine get_calculator_shell_count(vctx, vcalc, nsh) &
       & bind(C, name=namespace//"get_calculator_shell_count")
    type(c_ptr), value :: vctx
@@ -570,7 +597,8 @@ subroutine get_singlepoint_api(vctx, vmol, vcalc, vres) &
    end if
 
    call xtb_singlepoint(ctx%ptr, mol%ptr, calc%ptr, res%wfn, calc%accuracy, res%energy, &
-   & gradient=res%gradient, sigma=res%sigma, results=res%results, post_process=calc%post_proc)
+   & gradient=res%gradient, sigma=res%sigma, results=res%results, post_process=calc%post_proc, &
+   & save_hamiltonian_matrix_gradient=calc%save_hamiltonian_matrix_gradient)
 
 end subroutine get_singlepoint_api
 

@@ -42,7 +42,7 @@ module tblite_xtb_singlepoint
       & magnet_to_updown, updown_to_magnet
    use tblite_xtb_calculator, only : xtb_calculator
    use tblite_xtb_h0, only : get_selfenergy, get_hamiltonian, get_occupation, &
-      & get_hamiltonian_gradient
+      & get_hamiltonian_gradient, get_hamiltonian_matrix_gradient
    use tblite_post_processing_type, only : collect_containers_caches
    use tblite_post_processing_list, only : post_processing_list
    implicit none
@@ -69,7 +69,7 @@ contains
 
 !> Entry point for performing single point calculation using the xTB calculator
 subroutine xtb_singlepoint(ctx, mol, calc, wfn, accuracy, energy, gradient, sigma, &
-      & verbosity, results, post_process)
+      & verbosity, results, post_process, save_hamiltonian_matrix_gradient)
    !> Calculation context
    type(context_type), intent(inout) :: ctx
    !> Molecular structure data
@@ -91,13 +91,15 @@ subroutine xtb_singlepoint(ctx, mol, calc, wfn, accuracy, energy, gradient, sigm
    !> Container for storing additional results
    type(results_type), intent(out), optional :: results
    type(post_processing_list), intent(inout), optional :: post_process
+   !> Flag to save hamiltonian matrix gradient
+   logical, intent(in), optional :: save_hamiltonian_matrix_gradient
    
-   logical :: grad, converged, econverged, pconverged
+   logical :: grad, converged, econverged, pconverged, save_hgrad
    integer :: prlevel
    real(wp) :: econv, pconv, cutoff, elast, nel
    real(wp), allocatable :: energies(:), edisp(:), erep(:), exbond(:), eint(:), eelec(:)
    real(wp), allocatable :: cn(:), dcndr(:, :, :), dcndL(:, :, :), dEdcn(:)
-   real(wp), allocatable :: selfenergy(:), dsedcn(:), lattr(:, :), wdensity(:, :, :)
+   real(wp), allocatable :: selfenergy(:), dsedcn(:), lattr(:, :), wdensity(:, :, :), grad_before(:, :)
    type(integral_type) :: ints
    type(potential_type) :: pot
    type(container_cache), allocatable :: ccache, dcache, icache, hcache, rcache
@@ -123,6 +125,7 @@ subroutine xtb_singlepoint(ctx, mol, calc, wfn, accuracy, energy, gradient, sigm
    pconv = 2.e-5_wp*accuracy
 
    grad = present(gradient) .and. present(sigma)
+   save_hgrad = present(save_hamiltonian_matrix_gradient) .and. save_hamiltonian_matrix_gradient
 
    allocate(energies(mol%nat), source=0.0_wp)
    allocate(erep(mol%nat), source=0.0_wp)
@@ -318,6 +321,13 @@ subroutine xtb_singlepoint(ctx, mol, calc, wfn, accuracy, energy, gradient, sigm
       call updown_to_magnet(wdensity)
       call get_hamiltonian_gradient(mol, lattr, list, calc%bas, calc%h0, selfenergy, &
          & dsedcn, pot, wfn%density, wdensity, dEdcn, gradient, sigma)
+      
+      ! Store hamiltonian matrix gradient if requested
+      if (save_hgrad .and. present(results)) then
+         call get_hamiltonian_matrix_gradient(mol, lattr, list, calc%bas, calc%h0, selfenergy, &
+            & results%hamiltonian_matrix_gradient)
+      end if
+      
       call magnet_to_updown(wfn%density)
 
       if (allocated(dcndr)) then

@@ -149,6 +149,16 @@ tblite_set_calculator_save_integrals(tblite_context ctx,
                                      tblite_calculator calc,
                                      int save_integrals);
 
+/// Set the flag in the calculator to save the hamiltonian matrix gradient
+///
+/// @param ctx: Context handle
+/// @param calc: Calculator instance
+/// @param save_hamiltonian_matrix_gradient: Flag to enable storing of hamiltonian matrix gradient
+TBLITE_API_ENTRY void TBLITE_API_CALL
+tblite_set_calculator_save_hamiltonian_matrix_gradient(tblite_context ctx,
+                                                       tblite_calculator calc,
+                                                       int save_hamiltonian_matrix_gradient);
+
 /// Query calculator for the number of shells
 ///
 /// @param ctx: Context handle

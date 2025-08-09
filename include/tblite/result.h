@@ -235,7 +235,21 @@ tblite_get_result_hamiltonian_matrix(tblite_error error,
                                      tblite_result res,
                                      double* hmat);
 
-/// Retrieve Hamiltonian matrix from result container
+/// Retrieve Hamiltonian matrix gradient from result container
+///
+/// @param error: Handle for error messages
+/// @param res: Result container
+/// @param hmatgrad: Hamiltonian matrix gradient, shape [nao][nao][nat][3]
+/// @param nao: Number of atomic orbitals
+/// @param nat: Number of atoms
+TBLITE_API_ENTRY void TBLITE_API_CALL
+    tblite_get_result_hamiltonian_matrix_gradient(tblite_error error,
+                                                  tblite_result res,
+                                                  double* hmatgrad,
+                                                  int nao,
+                                                  int nat);
+
+/// Retrieve post processing dictionary from result container
 ///
 /// @param error: Handle for error messages
 /// @param res: Result container
