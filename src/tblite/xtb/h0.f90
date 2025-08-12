@@ -479,54 +479,59 @@ subroutine get_hamiltonian_gradient(mol, trans, list, bas, h0, selfenergy, dsedc
 end subroutine get_hamiltonian_gradient
 
 
-!> Compute the gradient of the core hamiltonian matrix with respect to nuclear positions
-subroutine get_hamiltonian_matrix_gradient(mol, trans, list, bas, h0, selfenergy, dH_dR)
+subroutine get_hamiltonian_matrix_gradient(mol, trans, list, bas, h0, selfenergy, dsedcn, &
+     & pmat, xmat, pot, dH_dR, sigma, dEdcn, dcndr)
    use mctc_env, only : wp
    use mctc_io, only : structure_type
    use tblite_adjlist, only : adjacency_list
    use tblite_basis_type, only : basis_type
    implicit none
 
-   !> Molecular structure data
    type(structure_type), intent(in) :: mol
-   !> Lattice points within a given realspace cutoff
-   real(wp), intent(in) :: trans(:, :)
-   !> Neighbour list
+   real(wp), intent(in)             :: trans(:, :)
    type(adjacency_list), intent(in) :: list
-   !> Basis set information
-   type(basis_type), intent(in) :: bas
-   !> Hamiltonian interaction data
+   type(basis_type), intent(in)     :: bas
    type(tb_hamiltonian), intent(in) :: h0
-   !> Diagonal elements of the Hamiltonian
-   real(wp), intent(in) :: selfenergy(:)
-   !> Gradient of the core hamiltonian matrix
+   real(wp), intent(in)             :: selfenergy(:)
+   real(wp), intent(in)             :: dsedcn(:)
+   real(wp), intent(in)             :: pmat(:, :, :)     ! unused here
+   real(wp), intent(in)             :: xmat(:, :, :)     ! unused here
+   type(potential_type), intent(in) :: pot               ! unused here
+   !> Hamiltonian matrix gradient tensor (nao, nao, nat, 3)
    real(wp), intent(out), allocatable :: dH_dR(:, :, :, :)
+   real(wp), intent(inout)          :: sigma(:, :)       ! unused here
+   real(wp), intent(inout)          :: dEdcn(:)          ! unused here
+   !> Optional CN derivative tensor (3, nat, nat): ∂CN(atom)/∂R(deriv_atom)
+   real(wp), intent(in), optional   :: dcndr(:, :, :)
 
-   integer :: iat, jat, izp, jzp, itr, img, inl
-   integer :: ish, jsh, is, js, ii, jj, iao, jao, nao, ij
+   integer :: iat, jat, iao, jao, k, img, inl, itr, a
+   integer :: is, js, ish, jsh, ii, jj, izp, jzp, nao, ij
    integer :: nat, nao_tot
-   real(wp) :: rr, r2, vec(3), hij, hscale, hs
-   real(wp) :: shpolyi, shpolyj, shpoly, dshpoly, dsv(3)
+   real(wp) :: vec(3), r2, shpoly
+   real(wp) :: scale, se_avg
+   real(wp) :: rr, shpolyi, shpolyj, drr_fac, dsh_dR_comp
+   real(wp) :: dscale_comp
    real(wp), allocatable :: stmp(:), dtmp(:, :), qtmp(:, :)
    real(wp), allocatable :: dstmp(:, :), ddtmpi(:, :, :), dqtmpi(:, :, :)
    real(wp), allocatable :: ddtmpj(:, :, :), dqtmpj(:, :, :)
 
+   ! Sizes and output allocation
    nat = mol%nat
    nao_tot = bas%nao
-
-   allocate(dH_dR(nao_tot, nao_tot, nat, 3))
+   if (.not.allocated(dH_dR)) then
+      allocate(dH_dR(nao_tot, nao_tot, nat, 3))
+   end if
    dH_dR = 0.0_wp
+   sigma = 0.0_wp
 
-   allocate(stmp(msao(bas%maxl)**2), dstmp(3, msao(bas%maxl)**2), &
-      & dtmp(3, msao(bas%maxl)**2), ddtmpi(3, 3, msao(bas%maxl)**2), &
-      & qtmp(6, msao(bas%maxl)**2), dqtmpi(3, 6, msao(bas%maxl)**2), &
-      & ddtmpj(3, 3, msao(bas%maxl)**2), dqtmpj(3, 6, msao(bas%maxl)**2))
+   ! Allocate integral work arrays
+   allocate(stmp(msao(bas%maxl)**2))
+   allocate(dtmp(3, msao(bas%maxl)**2), qtmp(6, msao(bas%maxl)**2))
+   allocate(dstmp(3, msao(bas%maxl)**2))
+   allocate(ddtmpi(3, 3, msao(bas%maxl)**2), dqtmpi(3, 6, msao(bas%maxl)**2))
+   allocate(ddtmpj(3, 3, msao(bas%maxl)**2), dqtmpj(3, 6, msao(bas%maxl)**2))
 
-   !$omp parallel do schedule(runtime) default(none) &
-   !$omp shared(mol, bas, trans, list, h0, selfenergy, dH_dR) &
-   !$omp private(iat, jat, izp, jzp, itr, is, js, ish, jsh, ii, jj, iao, jao, nao, ij) &
-   !$omp private(r2, vec, stmp, dtmp, qtmp, dstmp, ddtmpi, dqtmpi, ddtmpj, dqtmpj) &
-   !$omp private(rr, shpolyi, shpolyj, shpoly, dshpoly, dsv, hscale, hs, hij, img, inl)
+   ! Inter-atomic blocks (iat /= jat)
    do iat = 1, mol%nat
       izp = mol%id(iat)
       is = bas%ish_at(iat)
@@ -538,10 +543,10 @@ subroutine get_hamiltonian_matrix_gradient(mol, trans, list, bas, h0, selfenergy
          js = bas%ish_at(jat)
 
          if (iat == jat) cycle
-
          vec(:) = mol%xyz(:, iat) - mol%xyz(:, jat) - trans(:, itr)
          r2 = vec(1)**2 + vec(2)**2 + vec(3)**2
-         rr = sqrt(sqrt(r2) / (h0%rad(jzp) + h0%rad(izp)))
+         rr = sqrt(r2)
+         call get_shpoly_grad(h0, mol, bas, iat, jat, rr, shpoly, dsh_dR_comp)
 
          do ish = 1, bas%nsh_id(izp)
             ii = bas%iao_sh(is+ish)
@@ -549,38 +554,69 @@ subroutine get_hamiltonian_matrix_gradient(mol, trans, list, bas, h0, selfenergy
                jj = bas%iao_sh(js+jsh)
 
                call multipole_grad_cgto(bas%cgto(jsh, jzp), bas%cgto(ish, izp), &
-                  & r2, vec, bas%intcut, stmp, dtmp, qtmp, dstmp, ddtmpj, dqtmpj, &
-                  & ddtmpi, dqtmpi)
+                  & r2, vec, bas%intcut, stmp, dtmp, qtmp, dstmp, ddtmpj, dqtmpj, ddtmpi, dqtmpi)
 
-               shpolyi = 1.0_wp + h0%shpoly(ish, izp)*rr
-               shpolyj = 1.0_wp + h0%shpoly(jsh, jzp)*rr
-               shpoly = shpolyi * shpolyj
-               dshpoly = (shpolyi * h0%shpoly(jsh, jzp) + shpolyj * &
-                  & h0%shpoly(ish, izp)) * 0.5_wp * rr / r2
-               dsv(:) = dshpoly / shpoly * vec
+               ! Distance polynomial and its component-wise derivative factor
+               rr = sqrt(sqrt(r2) / (h0%rad(jzp) + h0%rad(izp)))
+               shpolyi = 1.0_wp + h0%shpoly(ish, izp) * rr
+               shpolyj = 1.0_wp + h0%shpoly(jsh, jzp) * rr
+               shpoly  = shpolyi * shpolyj
 
-               hscale = h0%hscale(jsh, ish, jzp, izp)
-               hs = hscale * shpoly
-               hij = 0.5_wp * (selfenergy(is+ish) + selfenergy(js+jsh)) * hs
-
+               scale = h0%hscale(jsh, ish, jzp, izp) * shpoly
                nao = msao(bas%cgto(jsh, jzp)%ang)
                do iao = 1, msao(bas%cgto(ish, izp)%ang)
                   do jao = 1, nao
                      ij = jao + nao*(iao-1)
 
-                     ! d/dR_iat H(jj+jao, ii+iao)
-                     dH_dR(jj+jao, ii+iao, iat, :) = dH_dR(jj+jao, ii+iao, iat, :) &
-                        + hij * (dstmp(:, ij) + stmp(ij) * dsv(:))
+                     se_avg = 0.5_wp * (selfenergy(is+ish) + selfenergy(js+jsh))
 
-                     ! d/dR_jat H(jj+jao, ii+iao) = - d/dR_iat H(jj+jao, ii+iao)
-                     dH_dR(jj+jao, ii+iao, jat, :) = dH_dR(jj+jao, ii+iao, jat, :) &
-                        - hij * (dstmp(:, ij) + stmp(ij) * dsv(:))
+                     ! 1) dS contributions (± for i/j)
+                     do k = 1, 3
+                        dH_dR(jj+jao, ii+iao, iat, k) = dH_dR(jj+jao, ii+iao, iat, k) &
+                           + dstmp(k, ij) * se_avg * scale
+                        dH_dR(ii+iao, jj+jao, iat, k) = dH_dR(ii+iao, jj+jao, iat, k) &
+                           + dstmp(k, ij) * se_avg * scale
 
-                     ! Enforce symmetry for the transposed element
-                     dH_dR(ii+iao, jj+jao, iat, :) = dH_dR(ii+iao, jj+jao, iat, :) &
-                        + hij * (dstmp(:, ij) + stmp(ij) * dsv(:))
-                     dH_dR(ii+iao, jj+jao, jat, :) = dH_dR(ii+iao, jj+jao, jat, :) &
-                        - hij * (dstmp(:, ij) + stmp(ij) * dsv(:))
+                        dH_dR(jj+jao, ii+iao, jat, k) = dH_dR(jj+jao, ii+iao, jat, k) &
+                           - dstmp(k, ij) * se_avg * scale
+                        dH_dR(ii+iao, jj+jao, jat, k) = dH_dR(ii+iao, jj+jao, jat, k) &
+                           - dstmp(k, ij) * se_avg * scale
+                     end do
+
+                     ! 2) d(scale) contributions via drr (component-wise, ± for i/j)
+                     if (r2 > 0.0_wp) then
+                        drr_fac = 0.5_wp * rr / r2
+                        do k = 1, 3
+                           dsh_dR_comp = ( shpolyj * h0%shpoly(ish, izp) + shpolyi * h0%shpoly(jsh, jzp) ) * drr_fac * vec(k)
+                           dscale_comp = h0%hscale(jsh, ish, jzp, izp) * dsh_dR_comp
+
+                           ! atom i contribution (+)
+                           dH_dR(jj+jao, ii+iao, iat, k) = dH_dR(jj+jao, ii+iao, iat, k) &
+                              + stmp(ij) * se_avg * dscale_comp
+                           dH_dR(ii+iao, jj+jao, iat, k) = dH_dR(ii+iao, jj+jao, iat, k) &
+                              + stmp(ij) * se_avg * dscale_comp
+
+                           ! atom j contribution (-)
+                           dH_dR(jj+jao, ii+iao, jat, k) = dH_dR(jj+jao, ii+iao, jat, k) &
+                              - stmp(ij) * se_avg * dscale_comp
+                           dH_dR(ii+iao, jj+jao, jat, k) = dH_dR(ii+iao, jj+jao, jat, k) &
+                              - stmp(ij) * se_avg * dscale_comp
+                        end do
+                     end if
+
+                     ! 3) CN-driven selfenergy terms: affect all atoms via dcndr
+                     if (present(dcndr)) then
+                        do a = 1, nat
+                           do k = 1, 3
+                              dH_dR(jj+jao, ii+iao, a, k) = dH_dR(jj+jao, ii+iao, a, k) &
+                                 + stmp(ij) * scale * 0.5_wp * ( &
+                                 & dsedcn(is+ish) * dcndr(k, a, iat) + dsedcn(js+jsh) * dcndr(k, a, jat) )
+                              dH_dR(ii+iao, jj+jao, a, k) = dH_dR(ii+iao, jj+jao, a, k) &
+                                 + stmp(ij) * scale * 0.5_wp * ( &
+                                 & dsedcn(is+ish) * dcndr(k, a, iat) + dsedcn(js+jsh) * dcndr(k, a, jat) )
+                           end do
+                        end do
+                     end if
                   end do
                end do
 
@@ -590,7 +626,73 @@ subroutine get_hamiltonian_matrix_gradient(mol, trans, list, bas, h0, selfenergy
       end do
    end do
 
+   ! On-site (iat == jat) blocks: only CN-driven selfenergy contributes
+   do iat = 1, mol%nat
+      izp = mol%id(iat)
+      is = bas%ish_at(iat)
+      vec(:) = 0.0_wp
+      do ish = 1, bas%nsh_id(izp)
+         ii = bas%iao_sh(is+ish)
+         do jsh = 1, bas%nsh_id(izp)
+            jj = bas%iao_sh(is+jsh)
+            call multipole_cgto(bas%cgto(jsh, izp), bas%cgto(ish, izp), &
+               & 0.0_wp, vec, bas%intcut, stmp, dtmp, qtmp)
+
+            nao = msao(bas%cgto(jsh, izp)%ang)
+            do iao = 1, msao(bas%cgto(ish, izp)%ang)
+               do jao = 1, nao
+                  ij = jao + nao*(iao-1)
+                  if (present(dcndr)) then
+                     do a = 1, nat
+                        do k = 1, 3
+                           dH_dR(jj+jao, ii+iao, a, k) = dH_dR(jj+jao, ii+iao, a, k) &
+                              + stmp(ij) * 0.5_wp * (dsedcn(is+ish) + dsedcn(is+jsh)) * dcndr(k, a, iat)
+                           dH_dR(ii+iao, jj+jao, a, k) = dH_dR(ii+iao, jj+jao, a, k) &
+                              + stmp(ij) * 0.5_wp * (dsedcn(is+ish) + dsedcn(is+jsh)) * dcndr(k, a, iat)
+                        end do
+                     end do
+                  end if
+               end do
+            end do
+         end do
+      end do
+   end do
+
 end subroutine get_hamiltonian_matrix_gradient
+
+
+!> Compute scalar shpoly and its radial derivative using shell-averaged coefficients
+pure subroutine get_shpoly_grad(h0, mol, bas, iat, jat, rab, shpoly, dshpoly_dr)
+   type(tb_hamiltonian), intent(in) :: h0
+   type(structure_type), intent(in) :: mol
+   type(basis_type), intent(in)     :: bas
+   integer, intent(in) :: iat, jat
+   real(wp), intent(in) :: rab
+   real(wp), intent(out) :: shpoly, dshpoly_dr
+
+   integer :: izp, jzp, ish
+   real(wp) :: rr, ai, aj
+
+   izp = mol%id(iat)
+   jzp = mol%id(jat)
+   rr = sqrt(rab / (h0%rad(jzp) + h0%rad(izp)))
+
+   ! shell-averaged linear coefficients for atoms i and j
+   ai = 0.0_wp
+   do ish = 1, bas%nsh_id(izp)
+      ai = ai + h0%shpoly(ish, izp)
+   end do
+   ai = ai / real(max(1, bas%nsh_id(izp)), wp)
+
+   aj = 0.0_wp
+   do ish = 1, bas%nsh_id(jzp)
+      aj = aj + h0%shpoly(ish, jzp)
+   end do
+   aj = aj / real(max(1, bas%nsh_id(jzp)), wp)
+
+   shpoly = (1.0_wp + ai*rr) * (1.0_wp + aj*rr)
+   dshpoly_dr = (ai + aj + 2.0_wp*ai*aj*rr) * 0.5_wp * rr / rab
+end subroutine get_shpoly_grad
 
 
 !> Compute the gradient of the overlap matrix with respect to nuclear positions
