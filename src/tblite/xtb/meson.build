@@ -17,6 +17,7 @@
 srcs += files(
   'calculator.f90',
   'coulomb.f90',
+  'f.f90',
   'gfn1.f90',
   'gfn2.f90',
   'h0.f90',

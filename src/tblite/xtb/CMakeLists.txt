@@ -20,6 +20,7 @@ list(
   APPEND srcs
   "${dir}/calculator.f90"
   "${dir}/coulomb.f90"
+  "${dir}/f.f90"
   "${dir}/gfn1.f90"
   "${dir}/gfn2.f90"
   "${dir}/h0.f90"
