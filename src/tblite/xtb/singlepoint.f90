@@ -106,7 +106,6 @@ subroutine xtb_singlepoint(ctx, mol, calc, wfn, accuracy, energy, gradient, sigm
    real(wp), allocatable :: energies(:), edisp(:), erep(:), exbond(:), eint(:), eelec(:)
    real(wp), allocatable :: cn(:), dcndr(:, :, :), dcndL(:, :, :), dEdcn(:)
    real(wp), allocatable :: selfenergy(:), dsedcn(:), lattr(:, :), wdensity(:, :, :), grad_before(:, :)
-   real(wp), allocatable :: dH_dR(:, :, :, :)
 
    type(integral_type) :: ints
    type(potential_type) :: pot
@@ -350,7 +349,7 @@ subroutine xtb_singlepoint(ctx, mol, calc, wfn, accuracy, energy, gradient, sigm
           end if
           if (save_hgrad) then
              call get_hamiltonian_matrix_gradient(mol, lattr, list, calc%bas, calc%h0, selfenergy, &
-                & dsedcn, dcndr, dH_dR)
+                & dsedcn, dcndr, results%hamiltonian_matrix_gradient)
           end if
          ! Fock matrix gradient: compute if the results object expects it
          if (save_fgrad) then
@@ -364,9 +363,9 @@ subroutine xtb_singlepoint(ctx, mol, calc, wfn, accuracy, energy, gradient, sigm
             end if
 
             ! Build dH/dR needed for MO response (generalized eigenproblem)
-            if (.not.allocated(dH_dR)) then
+            if (.not.allocated(results%hamiltonian_matrix_gradient)) then
                call get_hamiltonian_matrix_gradient(mol, lattr, list, calc%bas, calc%h0, selfenergy, &
-                  & dsedcn, dcndr, dH_dR)
+                  & dsedcn, dcndr, results%hamiltonian_matrix_gradient)
             end if
 
             ! Prepare output container
@@ -375,7 +374,7 @@ subroutine xtb_singlepoint(ctx, mol, calc, wfn, accuracy, energy, gradient, sigm
             end if
 
             ! Build Fock matrix gradient using AO-level tensors and MO response
-            call build_fock_gradient(results%overlap, results%overlap_matrix_gradient, dH_dR, wfn%coeff, wfn%emo, results%fock_matrix_gradient)
+            call build_fock_gradient(results%overlap, results%overlap_matrix_gradient, results%hamiltonian_matrix_gradient, wfn%coeff, wfn%emo, results%fock_matrix_gradient)
          end if
       end if
       

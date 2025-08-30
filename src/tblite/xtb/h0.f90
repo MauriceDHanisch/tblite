@@ -499,7 +499,7 @@ subroutine get_hamiltonian_matrix_gradient(mol, trans, list, bas, h0, selfenergy
    !> dCN/dR, shape (3, nat, nat)
    real(wp), intent(in) :: dcndr(:, :, :)
    !> Cartesian gradient of H, shape (nao, nao, nat, 3)
-   real(wp), intent(out) :: dHdr(:, :, :, :)
+   real(wp), intent(out), allocatable :: dHdr(:, :, :, :)
 
    integer :: iat, jat, izp, jzp, itr, img, inl
    integer :: ish, jsh, is, js, ii, jj, iao, jao, nao, ij
@@ -510,6 +510,7 @@ subroutine get_hamiltonian_matrix_gradient(mol, trans, list, bas, h0, selfenergy
    real(wp), allocatable :: dstmp(:, :), ddtmpi(:, :, :), dqtmpi(:, :, :)
    real(wp), allocatable :: ddtmpj(:, :, :), dqtmpj(:, :, :)
 
+   if (.not.allocated(dHdr)) allocate(dHdr(bas%nao, bas%nao, mol%nat, 3))
    dHdr(:, :, :, :) = 0.0_wp
 
    allocate(stmp(msao(bas%maxl)**2), dstmp(3, msao(bas%maxl)**2), &
@@ -617,9 +618,9 @@ subroutine get_hamiltonian_matrix_gradient(mol, trans, list, bas, h0, selfenergy
 
                   do kat = 1, mol%nat
                      pref = 0.5_wp * (dsedcn(is+ish) + dsedcn(is+jsh))
-                     dHdr(kat, :, jj+jao, ii+iao) = dHdr(kat, :, jj+jao, ii+iao) &
+                     dHdr(jj+jao, ii+iao, kat, :) = dHdr(jj+jao, ii+iao, kat, :) &
                         + stmp(ij) * pref * dcndr(:, kat, iat)
-                     dHdr(kat, :, ii+iao, jj+jao) = dHdr(kat, :, ii+iao, jj+jao) &
+                     dHdr(ii+iao, jj+jao, kat, :) = dHdr(ii+iao, jj+jao, kat, :) &
                         + stmp(ij) * pref * dcndr(:, kat, iat)
                   end do
 
@@ -663,7 +664,7 @@ subroutine get_overlap_matrix_gradient(mol, trans, list, bas, dS_dR)
    nat = mol%nat
    nao_tot = bas%nao
 
-   allocate(dS_dR(nao_tot, nao_tot, nat, 3))
+   if (.not.allocated(dS_dR)) allocate(dS_dR(nao_tot, nao_tot, nat, 3))
    dS_dR = 0.0_wp
 
    allocate(stmp(msao(bas%maxl)**2))
