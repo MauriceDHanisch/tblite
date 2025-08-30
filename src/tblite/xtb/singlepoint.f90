@@ -350,7 +350,7 @@ subroutine xtb_singlepoint(ctx, mol, calc, wfn, accuracy, energy, gradient, sigm
           end if
           if (save_hgrad) then
              call get_hamiltonian_matrix_gradient(mol, lattr, list, calc%bas, calc%h0, selfenergy, &
-                & dsedcn, wfn%density, wdensity, pot, results%hamiltonian_matrix_gradient, sigma, dEdcn, dcndr)
+                & dsedcn, dcndr, dH_dR)
           end if
          ! Fock matrix gradient: compute if the results object expects it
          if (save_fgrad) then
@@ -366,7 +366,7 @@ subroutine xtb_singlepoint(ctx, mol, calc, wfn, accuracy, energy, gradient, sigm
             ! Build dH/dR needed for MO response (generalized eigenproblem)
             if (.not.allocated(dH_dR)) then
                call get_hamiltonian_matrix_gradient(mol, lattr, list, calc%bas, calc%h0, selfenergy, &
-                  & dsedcn, wfn%density, wdensity, pot, dH_dR, sigma, dEdcn, dcndr)
+                  & dsedcn, dcndr, dH_dR)
             end if
 
             ! Prepare output container
