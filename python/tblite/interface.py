@@ -246,7 +246,7 @@ class Result:
         "overlap-matrix": library.get_overlap_matrix,
         "overlap-gradient": library.get_overlap_gradient,
         "hamiltonian-matrix": library.get_hamiltonian_matrix,
-        "hamiltonian-gradient": library.get_hamiltonian_cgradient,
+        "hamiltonian-gradient": library.get_hamiltonian_gradient,
         "fock-matrix": library.get_fock_matrix,
         "fock-gradient": library.get_fock_gradient,
         "post-processing-dict": library.get_post_processing_dict,
