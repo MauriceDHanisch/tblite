@@ -54,11 +54,11 @@ positions = np.array([[0.0, 0.0, 0.0],
 calc = Calculator(method="GFN1-xTB", numbers=numbers, positions=positions)
 calc.set("save-integrals", 1)
 calc.set("verbosity", 0)
-calc.set("save-hamiltonian-matrix-gradient", 1)
+calc.set("save-h-gradient", 1)
 res = calc.singlepoint()
 
 H  = res.get("hamiltonian-matrix")
-dH = res.get("hamiltonian-matrix-gradient")  # (nao, nao, nat, 3)
+dH = res.get("hamiltonian-gradient")  # (nao, nao, nat, 3)
 
 # --- numerical check ---
 h = 1e-3  # displacement in same unit as `positions`
@@ -72,7 +72,7 @@ rel = rms / (np.sqrt(np.mean(dH_num**2)) + 1e-16)
 
 print(f"H shape {H.shape}, dH shape {dH.shape}")
 print("H = ")
-np.set_printoptions(precision=4, suppress=True)
+np.set_printoptions(precision=6, suppress=True)
 print(H)
 
 print("\ndH = ")

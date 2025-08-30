@@ -31,7 +31,7 @@ module tblite_xtb_h0
 
    public ::  new_hamiltonian
    public :: get_selfenergy, get_hamiltonian, get_occupation, get_hamiltonian_gradient, &
-      & get_hamiltonian_matrix_gradient, get_overlap_matrix_gradient
+      & get_hamiltonian_cgradient, get_overlap_gradient
 
 
    type, public :: tb_hamiltonian
@@ -481,7 +481,7 @@ end subroutine get_hamiltonian_gradient
 
 !> Compute Cartesian gradient of the Hamiltonian matrix H with respect to atomic coordinates
 !> Output shape: (nao, nao, nat, 3)
-subroutine get_hamiltonian_matrix_gradient(mol, trans, list, bas, h0, selfenergy, dsedcn, dcndr, dHdr)
+subroutine get_hamiltonian_cgradient(mol, trans, list, bas, h0, selfenergy, dsedcn, dcndr, dHdr)
    !> Molecular structure data
    type(structure_type), intent(in) :: mol
    !> Lattice points within a given realspace cutoff
@@ -629,11 +629,11 @@ subroutine get_hamiltonian_matrix_gradient(mol, trans, list, bas, h0, selfenergy
       end do
    end do
 
-end subroutine get_hamiltonian_matrix_gradient
+end subroutine get_hamiltonian_cgradient
 
 
 !> Compute the gradient of the overlap matrix with respect to nuclear positions
-subroutine get_overlap_matrix_gradient(mol, trans, list, bas, dS_dR)
+subroutine get_overlap_gradient(mol, trans, list, bas, dS_dR)
    use mctc_env, only : wp
    use mctc_io, only : structure_type
    use tblite_adjlist, only : adjacency_list
@@ -716,7 +716,7 @@ subroutine get_overlap_matrix_gradient(mol, trans, list, bas, dS_dR)
       end do
    end do
 
-end subroutine get_overlap_matrix_gradient
+end subroutine get_overlap_gradient
 
 
 subroutine get_occupation(mol, bas, h0, nocc, n0at, n0sh)

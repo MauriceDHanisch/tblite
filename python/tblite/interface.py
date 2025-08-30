@@ -244,11 +244,11 @@ class Result:
         "orbital-coefficients": library.get_orbital_coefficients,
         "density-matrix": library.get_density_matrix,
         "overlap-matrix": library.get_overlap_matrix,
-        "overlap-matrix-gradient": library.get_overlap_matrix_gradient,
+        "overlap-gradient": library.get_overlap_gradient,
         "hamiltonian-matrix": library.get_hamiltonian_matrix,
-        "hamiltonian-matrix-gradient": library.get_hamiltonian_matrix_gradient,
+        "hamiltonian-gradient": library.get_hamiltonian_cgradient,
         "fock-matrix": library.get_fock_matrix,
-        "fock-matrix-gradient": library.get_fock_matrix_gradient,
+        "fock-gradient": library.get_fock_gradient,
         "post-processing-dict": library.get_post_processing_dict,
         "natoms": library.get_number_of_atoms,
         "norbitals": library.get_number_of_orbitals,
@@ -270,14 +270,14 @@ class Result:
         Get a quantity stored instade the result container.
         The following quantities are available
 
-        ========================= ================================= ===============
-         property                  dimension [spin-polarized case]   unit
-        ========================= ================================= ===============
-         energy                    scalar                            Hartree
-         energies                  nat                               Hartree
-         gradient                  nat, 3                            Hartree/Bohr
-         virial                    3, 3                              Hartree
-         charges                   nat                               e
+        ====================== ================================= ==============
+         property               dimension [spin-polarized case]   unit
+        ====================== ================================= ==============
+         energy                 scalar                            Hartree
+         energies               nat                               Hartree
+         gradient               nat, 3                            Hartree/Bohr
+         virial                 3, 3                              Hartree
+         charges                nat                               e
          bond-orders            nat, nat                          e
          dipole                 3                                 e·Bohr
          quadrupole             6                                 e·Bohr²
@@ -285,14 +285,15 @@ class Result:
          orbital-occupations    norb [2, norb]                    e
          orbital-coefficients   norb, norb [2, norb, norb]        unitless
          overlap-matrix         norb, norb                        unitless
-         overlap-matrix-gradient  norb, norb, nat, 3              unitless
          hamiltonian-matrix     norb, norb                        Hartree
-         hamiltonian-matrix-gradient   norb, norb, nat, 3         Hartree/Bohr
          density-matrix         norb, norb [2, norb, norb]        e
+         overlap-gradient       norb, norb, nat, 3                unitless
+         hamiltonian-gradient   norb, norb, nat, 3                Hartree/Bohr
+         fock-gradient          norb, norb, nat, 3                Hartree/Bohr
          natoms                 scalar                            unitless
          norbitals              scalar                            unitless
          post-processing-dict   dependes on the key               /
-        ========================= ================================= ===============
+        ====================== ================================= ==============
     
         Notes
         -----
@@ -487,9 +488,9 @@ class Calculator(Structure):
         "max-iter": library.set_calculator_max_iter,
         "mixer-damping": library.set_calculator_mixer_damping,
         "save-integrals": library.set_calculator_save_integrals,
-        "save-hamiltonian-matrix-gradient": library.set_calculator_save_hamiltonian_matrix_gradient,
-        "save-overlap-matrix-gradient": library.set_calculator_save_overlap_matrix_gradient,
-            "save-fock-matrix-gradient": library.set_calculator_save_fock_matrix_gradient,
+        "save-h-gradient": library.set_calculator_save_hamiltonian_gradient,
+        "save-o-gradient": library.set_calculator_save_overlap_gradient,
+        "save-f-gradient": library.set_calculator_save_fock_gradient,
         "temperature": library.set_calculator_temperature,
         "verbosity": library.set_calculator_verbosity,
     }
@@ -557,9 +558,9 @@ class Calculator(Structure):
          max-iter          Maximum number of SCC iterations     250
          mixer-damping     Parameter for the SCC mixer          0.4
          save-integrals    Keep integral matrices in results    0 (False)
-         save-hamiltonian-matrix-gradient Keep hamiltonian matrix gradient in results 0 (False)
-          save-overlap-matrix-gradient Keep overlap matrix gradient in results 0 (False)
-          save-fock-matrix-gradient Keep fock matrix gradient in results 0 (False)
+         save-h-gradient   Keep hamiltonian gradient            0 (False)
+         save-o-gradient   Keep overlap matrix gradient         0 (False)
+         save-f-gradient   Keep fock gradient                   0 (False)
          temperature       Electronic temperature for filling   9.500e-4
          verbosity         Set verbosity of printout            1
         ================= ==================================== =================

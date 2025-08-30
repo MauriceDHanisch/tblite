@@ -42,8 +42,8 @@ module tblite_xtb_singlepoint
       & magnet_to_updown, updown_to_magnet
    use tblite_xtb_calculator, only : xtb_calculator
    use tblite_xtb_h0, only : get_selfenergy, get_hamiltonian, get_occupation, &
-      & get_hamiltonian_gradient, get_hamiltonian_matrix_gradient, &
-      & get_overlap_matrix_gradient
+      & get_hamiltonian_gradient, get_hamiltonian_cgradient, &
+      & get_overlap_gradient
    use tblite_post_processing_type, only : collect_containers_caches
    use tblite_post_processing_list, only : post_processing_list
    implicit none
@@ -70,8 +70,8 @@ contains
 
 !> Entry point for performing single point calculation using the xTB calculator
 subroutine xtb_singlepoint(ctx, mol, calc, wfn, accuracy, energy, gradient, sigma, &
-      & verbosity, results, post_process, save_hamiltonian_matrix_gradient, save_overlap_matrix_gradient, &
-      & save_fock_matrix_gradient)
+      & verbosity, results, post_process, save_hamiltonian_gradient, save_overlap_gradient, &
+      & save_fock_gradient)
    !> Calculation context
    type(context_type), intent(inout) :: ctx
    !> Molecular structure data
@@ -94,11 +94,11 @@ subroutine xtb_singlepoint(ctx, mol, calc, wfn, accuracy, energy, gradient, sigm
    type(results_type), intent(out), optional :: results
    type(post_processing_list), intent(inout), optional :: post_process
    !> Flag to save hamiltonian matrix gradient
-   logical, intent(in), optional :: save_hamiltonian_matrix_gradient
+   logical, intent(in), optional :: save_hamiltonian_gradient
    !> Flag to save overlap matrix gradient
-   logical, intent(in), optional :: save_overlap_matrix_gradient
+   logical, intent(in), optional :: save_overlap_gradient
    !> Flag to save fock matrix gradient
-   logical, intent(in), optional :: save_fock_matrix_gradient
+   logical, intent(in), optional :: save_fock_gradient
    
    logical :: grad, converged, econverged, pconverged, save_hgrad, save_sgrad, save_fgrad
    integer :: prlevel
@@ -135,9 +135,9 @@ subroutine xtb_singlepoint(ctx, mol, calc, wfn, accuracy, energy, gradient, sigm
    pconv = 2.e-5_wp*accuracy
 
    grad = present(gradient) .and. present(sigma)
-   save_hgrad = present(save_hamiltonian_matrix_gradient) .and. save_hamiltonian_matrix_gradient
-   save_sgrad = present(save_overlap_matrix_gradient) .and. save_overlap_matrix_gradient
-   save_fgrad = present(save_fock_matrix_gradient) .and. save_fock_matrix_gradient
+   save_hgrad = present(save_hamiltonian_gradient) .and. save_hamiltonian_gradient
+   save_sgrad = present(save_overlap_gradient) .and. save_overlap_gradient
+   save_fgrad = present(save_fock_gradient) .and. save_fock_gradient
 
    allocate(energies(mol%nat), source=0.0_wp)
    allocate(erep(mol%nat), source=0.0_wp)
@@ -345,17 +345,17 @@ subroutine xtb_singlepoint(ctx, mol, calc, wfn, accuracy, energy, gradient, sigm
       ! Store overlap and hamiltonian matrix gradients if requested
       if (present(results)) then
           if (save_sgrad) then
-             call get_overlap_matrix_gradient(mol, lattr, list, calc%bas, results%overlap_matrix_gradient)
+             call get_overlap_gradient(mol, lattr, list, calc%bas, results%overlap_gradient)
           end if
           if (save_hgrad) then
-             call get_hamiltonian_matrix_gradient(mol, lattr, list, calc%bas, calc%h0, selfenergy, &
-                & dsedcn, dcndr, results%hamiltonian_matrix_gradient)
+             call get_hamiltonian_cgradient(mol, lattr, list, calc%bas, calc%h0, selfenergy, &
+                & dsedcn, dcndr, results%hamiltonian_gradient)
           end if
          ! Fock matrix gradient: compute if the results object expects it
          if (save_fgrad) then
             ! Make sure overlap and its gradient are available
-            if (.not.allocated(results%overlap_matrix_gradient)) then
-               call get_overlap_matrix_gradient(mol, lattr, list, calc%bas, results%overlap_matrix_gradient)
+            if (.not.allocated(results%overlap_gradient)) then
+               call get_overlap_gradient(mol, lattr, list, calc%bas, results%overlap_gradient)
             end if
             ! S matrix: prefer saved copy; fall back to local integrals
             if (.not.allocated(results%overlap)) then
@@ -363,18 +363,18 @@ subroutine xtb_singlepoint(ctx, mol, calc, wfn, accuracy, energy, gradient, sigm
             end if
 
             ! Build dH/dR needed for MO response (generalized eigenproblem)
-            if (.not.allocated(results%hamiltonian_matrix_gradient)) then
-               call get_hamiltonian_matrix_gradient(mol, lattr, list, calc%bas, calc%h0, selfenergy, &
-                  & dsedcn, dcndr, results%hamiltonian_matrix_gradient)
+            if (.not.allocated(results%hamiltonian_gradient)) then
+               call get_hamiltonian_cgradient(mol, lattr, list, calc%bas, calc%h0, selfenergy, &
+                  & dsedcn, dcndr, results%hamiltonian_gradient)
             end if
 
             ! Prepare output container
-            if (.not.allocated(results%fock_matrix_gradient)) then
-               allocate(results%fock_matrix_gradient(calc%bas%nao, calc%bas%nao, mol%nat, 3))
+            if (.not.allocated(results%fock_gradient)) then
+               allocate(results%fock_gradient(calc%bas%nao, calc%bas%nao, mol%nat, 3))
             end if
 
             ! Build Fock matrix gradient using AO-level tensors and MO response
-            call build_fock_gradient(results%overlap, results%overlap_matrix_gradient, results%hamiltonian_matrix_gradient, wfn%coeff, wfn%emo, results%fock_matrix_gradient)
+            call build_fock_gradient(results%overlap, results%overlap_gradient, results%hamiltonian_gradient, wfn%coeff, wfn%emo, results%fock_gradient)
          end if
       end if
       

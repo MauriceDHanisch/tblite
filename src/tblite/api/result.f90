@@ -41,9 +41,9 @@ module tblite_api_result
       & get_result_orbital_coefficients_api, get_result_energies_api, &
        & get_result_density_matrix_api, get_result_overlap_matrix_api, &
       & get_result_hamiltonian_matrix_api, get_result_fock_matrix_api, &
-       & get_result_hamiltonian_matrix_gradient_api, &
-       & get_result_overlap_matrix_gradient_api, &
-       & get_result_fock_matrix_gradient_api, &
+       & get_result_hamiltonian_gradient_api, &
+       & get_result_overlap_gradient_api, &
+       & get_result_fock_gradient_api, &
       & get_result_bond_orders_api, get_post_processing_dict_api
 
 
@@ -610,8 +610,8 @@ subroutine get_result_fock_matrix_api(verror, vres, fmat) &
    end block
 end subroutine get_result_fock_matrix_api
 
-subroutine get_result_fock_matrix_gradient_api(verror, vres, fmatgrad, nao, nat) &
-      & bind(C, name=namespace//"get_result_fock_matrix_gradient")
+subroutine get_result_fock_gradient_api(verror, vres, fmatgrad, nao, nat) &
+      & bind(C, name=namespace//"get_result_fock_gradient")
    type(c_ptr), value :: verror
    type(vp_error), pointer :: error
    type(c_ptr), value :: vres
@@ -620,7 +620,7 @@ subroutine get_result_fock_matrix_gradient_api(verror, vres, fmatgrad, nao, nat)
    integer(c_int), value :: nao, nat
    logical :: ok
 
-   if (debug) print '("[Info]", 1x, a)', "get_result_fock_matrix_gradient"
+   if (debug) print '("[Info]", 1x, a)', "get_result_fock_gradient"
 
    call get_result(verror, vres, error, res, ok)
    if (.not.ok) return
@@ -630,16 +630,16 @@ subroutine get_result_fock_matrix_gradient_api(verror, vres, fmatgrad, nao, nat)
       return
    end if
 
-   if (.not.allocated(res%results%fock_matrix_gradient)) then
+   if (.not.allocated(res%results%fock_gradient)) then
       call fatal_error(error%ptr, "Fock matrix gradient not available")
       return
    end if
 
-   fmatgrad(:nao*nao*nat*3) = reshape(res%results%fock_matrix_gradient, [nao*nao*nat*3])
-end subroutine get_result_fock_matrix_gradient_api
+   fmatgrad(:nao*nao*nat*3) = reshape(res%results%fock_gradient, [nao*nao*nat*3])
+end subroutine get_result_fock_gradient_api
 
-subroutine get_result_overlap_matrix_gradient_api(verror, vres, smatgrad, nao, nat) &
-      & bind(C, name=namespace//"get_result_overlap_matrix_gradient")
+subroutine get_result_overlap_gradient_api(verror, vres, smatgrad, nao, nat) &
+      & bind(C, name=namespace//"get_result_overlap_gradient")
    type(c_ptr), value :: verror
    type(vp_error), pointer :: error
    type(c_ptr), value :: vres
@@ -648,7 +648,7 @@ subroutine get_result_overlap_matrix_gradient_api(verror, vres, smatgrad, nao, n
    integer(c_int), value :: nao, nat
    logical :: ok
 
-   if (debug) print '("[Info]", 1x, a)', "get_result_overlap_matrix_gradient"
+   if (debug) print '("[Info]", 1x, a)', "get_result_overlap_gradient"
 
    call get_result(verror, vres, error, res, ok)
    if (.not.ok) return
@@ -658,16 +658,16 @@ subroutine get_result_overlap_matrix_gradient_api(verror, vres, smatgrad, nao, n
       return
    end if
 
-   if (.not.allocated(res%results%overlap_matrix_gradient)) then
+   if (.not.allocated(res%results%overlap_gradient)) then
       call fatal_error(error%ptr, "Overlap matrix gradient not available")
       return
    end if
 
-   smatgrad(:nao*nao*nat*3) = reshape(res%results%overlap_matrix_gradient, [nao*nao*nat*3])
-end subroutine get_result_overlap_matrix_gradient_api
+   smatgrad(:nao*nao*nat*3) = reshape(res%results%overlap_gradient, [nao*nao*nat*3])
+end subroutine get_result_overlap_gradient_api
 
-subroutine get_result_hamiltonian_matrix_gradient_api(verror, vres, hmatgrad, nao, nat) &
-      & bind(C, name=namespace//"get_result_hamiltonian_matrix_gradient")
+subroutine get_result_hamiltonian_gradient_api(verror, vres, hmatgrad, nao, nat) &
+      & bind(C, name=namespace//"get_result_hamiltonian_gradient")
    type(c_ptr), value :: verror
    type(vp_error), pointer :: error
    type(c_ptr), value :: vres
@@ -676,7 +676,7 @@ subroutine get_result_hamiltonian_matrix_gradient_api(verror, vres, hmatgrad, na
    integer(c_int), value :: nao, nat
    logical :: ok
 
-   if (debug) print '("[Info]", 1x, a)', "get_result_hamiltonian_matrix_gradient"
+   if (debug) print '("[Info]", 1x, a)', "get_result_hamiltonian_gradient"
 
    call get_result(verror, vres, error, res, ok)
    if (.not.ok) return
@@ -686,13 +686,13 @@ subroutine get_result_hamiltonian_matrix_gradient_api(verror, vres, hmatgrad, na
       return
    end if
 
-   if (.not.allocated(res%results%hamiltonian_matrix_gradient)) then
+   if (.not.allocated(res%results%hamiltonian_gradient)) then
       call fatal_error(error%ptr, "Hamiltonian matrix gradient not available")
       return
    end if
 
-   hmatgrad(:nao*nao*nat*3) = reshape(res%results%hamiltonian_matrix_gradient, [nao*nao*nat*3])
-end subroutine get_result_hamiltonian_matrix_gradient_api
+   hmatgrad(:nao*nao*nat*3) = reshape(res%results%hamiltonian_gradient, [nao*nao*nat*3])
+end subroutine get_result_hamiltonian_gradient_api
 
 
 subroutine get_result_bond_orders_api(verror, vres, mbo) &

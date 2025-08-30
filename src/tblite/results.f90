@@ -36,11 +36,11 @@ module tblite_results
       !> Fock matrix (spin-resolved: nspin, nao, nao)
       real(wp), allocatable :: fock(:, :, :)
       !> Overlap matrix gradient (optional, shape: nao, nao, nat, 3)
-      real(wp), allocatable :: overlap_matrix_gradient(:, :, :, :)
+      real(wp), allocatable :: overlap_gradient(:, :, :, :)
       !> Hamiltonian matrix gradient (optional, shape: nao, nao, nat, 3)
-      real(wp), allocatable :: hamiltonian_matrix_gradient(:, :, :, :)
+      real(wp), allocatable :: hamiltonian_gradient(:, :, :, :)
       !> Fock matrix gradient (optional, shape: nao, nao, nat, 3)
-      real(wp), allocatable :: fock_matrix_gradient(:, :, :, :)
+      real(wp), allocatable :: fock_gradient(:, :, :, :)
       type(double_dictionary_type), allocatable :: dict
    end type results_type
 

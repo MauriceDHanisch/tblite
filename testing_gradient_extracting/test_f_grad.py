@@ -54,11 +54,11 @@ positions = np.array([[0.0, 0.0, 0.0],
 calc = Calculator(method="GFN1-xTB", numbers=numbers, positions=positions)
 calc.set("save-integrals", 1)
 calc.set("verbosity", 0)
-calc.set("save-fock-matrix-gradient", 1)
+calc.set("save-f-gradient", 1)
 res = calc.singlepoint()
 
 F  = res.get("fock-matrix")
-dF = res.get("fock-matrix-gradient")  # (nao, nao, nat, 3)
+dF = res.get("fock-gradient")  # (nao, nao, nat, 3)
 
 # --- numerical check ---
 h = 1e-3  # displacement in same unit as `positions`

@@ -46,8 +46,8 @@ module tblite_api_calculator
       & new_xtb_calculator_api
    public :: set_calculator_mixer_damping_api, set_calculator_max_iter_api, &
       & set_calculator_accuracy_api, set_calculator_temperature_api, &
-      & set_calculator_save_integrals_api, set_calculator_save_hamiltonian_matrix_gradient_api, &
-      & set_calculator_save_overlap_matrix_gradient_api
+      & set_calculator_save_integrals_api, set_calculator_save_hamiltonian_gradient_api, &
+      & set_calculator_save_overlap_gradient_api
    public :: get_singlepoint_api
    public :: push_back_post_processing_param_api, push_back_post_processing_str_api
 
@@ -72,11 +72,11 @@ module tblite_api_calculator
       !> Numbers of spin channels for calculator
       integer :: nspin = 1
       !> Flag to save hamiltonian matrix gradient
-      logical :: save_hamiltonian_matrix_gradient = .false.
+      logical :: save_hamiltonian_gradient = .false.
       !> Flag to save overlap matrix gradient
-      logical :: save_overlap_matrix_gradient = .false.
+      logical :: save_overlap_gradient = .false.
        !> Flag to save fock matrix gradient
-       logical :: save_fock_matrix_gradient = .false.
+       logical :: save_fock_gradient = .false.
       type(post_processing_list) :: post_proc
    end type vp_calculator
 
@@ -387,16 +387,16 @@ subroutine set_calculator_save_integrals_api(vctx, vcalc, save_integrals) &
 end subroutine set_calculator_save_integrals_api
 
 
-subroutine set_calculator_save_hamiltonian_matrix_gradient_api(vctx, vcalc, save_hamiltonian_matrix_gradient) &
-      & bind(C, name=namespace//"set_calculator_save_hamiltonian_matrix_gradient")
+subroutine set_calculator_save_hamiltonian_gradient_api(vctx, vcalc, save_hamiltonian_gradient) &
+      & bind(C, name=namespace//"set_calculator_save_hamiltonian_gradient")
    type(c_ptr), value :: vctx
    type(vp_context), pointer :: ctx
    type(c_ptr), value :: vcalc
    type(vp_calculator), pointer :: calc
-   integer(c_int), value :: save_hamiltonian_matrix_gradient
+   integer(c_int), value :: save_hamiltonian_gradient
    type(error_type), allocatable :: error
 
-   if (debug) print '("[Info]", 1x, a)', "set_calculator_save_hamiltonian_matrix_gradient"
+   if (debug) print '("[Info]", 1x, a)', "set_calculator_save_hamiltonian_gradient"
 
    if (.not.c_associated(vctx)) return
    call c_f_pointer(vctx, ctx)
@@ -408,19 +408,19 @@ subroutine set_calculator_save_hamiltonian_matrix_gradient_api(vctx, vcalc, save
    end if
    call c_f_pointer(vcalc, calc)
 
-   calc%save_hamiltonian_matrix_gradient = save_hamiltonian_matrix_gradient /= 0
-end subroutine set_calculator_save_hamiltonian_matrix_gradient_api
+   calc%save_hamiltonian_gradient = save_hamiltonian_gradient /= 0
+end subroutine set_calculator_save_hamiltonian_gradient_api
 
-subroutine set_calculator_save_overlap_matrix_gradient_api(vctx, vcalc, save_overlap_matrix_gradient) &
-      & bind(C, name=namespace//"set_calculator_save_overlap_matrix_gradient")
+subroutine set_calculator_save_overlap_gradient_api(vctx, vcalc, save_overlap_gradient) &
+      & bind(C, name=namespace//"set_calculator_save_overlap_gradient")
    type(c_ptr), value :: vctx
    type(vp_context), pointer :: ctx
    type(c_ptr), value :: vcalc
    type(vp_calculator), pointer :: calc
-   integer(c_int), value :: save_overlap_matrix_gradient
+   integer(c_int), value :: save_overlap_gradient
    type(error_type), allocatable :: error
 
-   if (debug) print '("[Info]", 1x, a)', "set_calculator_save_overlap_matrix_gradient"
+   if (debug) print '("[Info]", 1x, a)', "set_calculator_save_overlap_gradient"
 
    if (.not.c_associated(vctx)) return
    call c_f_pointer(vctx, ctx)
@@ -432,19 +432,19 @@ subroutine set_calculator_save_overlap_matrix_gradient_api(vctx, vcalc, save_ove
    end if
    call c_f_pointer(vcalc, calc)
 
-   calc%save_overlap_matrix_gradient = save_overlap_matrix_gradient /= 0
-end subroutine set_calculator_save_overlap_matrix_gradient_api
+   calc%save_overlap_gradient = save_overlap_gradient /= 0
+end subroutine set_calculator_save_overlap_gradient_api
 
-subroutine set_calculator_save_fock_matrix_gradient_api(vctx, vcalc, save_fock_matrix_gradient) &
-      & bind(C, name=namespace//"set_calculator_save_fock_matrix_gradient")
+subroutine set_calculator_save_fock_gradient_api(vctx, vcalc, save_fock_gradient) &
+      & bind(C, name=namespace//"set_calculator_save_fock_gradient")
    type(c_ptr), value :: vctx
    type(vp_context), pointer :: ctx
    type(c_ptr), value :: vcalc
    type(vp_calculator), pointer :: calc
-   integer(c_int), value :: save_fock_matrix_gradient
+   integer(c_int), value :: save_fock_gradient
    type(error_type), allocatable :: error
 
-   if (debug) print '("[Info]", 1x, a)', "set_calculator_save_fock_matrix_gradient"
+   if (debug) print '("[Info]", 1x, a)', "set_calculator_save_fock_gradient"
 
    if (.not.c_associated(vctx)) return
    call c_f_pointer(vctx, ctx)
@@ -456,8 +456,8 @@ subroutine set_calculator_save_fock_matrix_gradient_api(vctx, vcalc, save_fock_m
    end if
    call c_f_pointer(vcalc, calc)
 
-   calc%save_fock_matrix_gradient = save_fock_matrix_gradient /= 0
-end subroutine set_calculator_save_fock_matrix_gradient_api
+   calc%save_fock_gradient = save_fock_gradient /= 0
+end subroutine set_calculator_save_fock_gradient_api
 
 subroutine get_calculator_shell_count(vctx, vcalc, nsh) &
       & bind(C, name=namespace//"get_calculator_shell_count")
@@ -651,9 +651,9 @@ subroutine get_singlepoint_api(vctx, vmol, vcalc, vres) &
 
     call xtb_singlepoint(ctx%ptr, mol%ptr, calc%ptr, res%wfn, calc%accuracy, res%energy, &
     & gradient=res%gradient, sigma=res%sigma, results=res%results, post_process=calc%post_proc, &
-    & save_hamiltonian_matrix_gradient=calc%save_hamiltonian_matrix_gradient, &
-    & save_overlap_matrix_gradient=calc%save_overlap_matrix_gradient, &
-    & save_fock_matrix_gradient=calc%save_fock_matrix_gradient)
+    & save_hamiltonian_gradient=calc%save_hamiltonian_gradient, &
+    & save_overlap_gradient=calc%save_overlap_gradient, &
+    & save_fock_gradient=calc%save_fock_gradient)
 
 end subroutine get_singlepoint_api
 

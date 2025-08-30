@@ -253,11 +253,11 @@ tblite_get_result_fock_matrix(tblite_error error,
 /// @param nao: Number of atomic orbitals
 /// @param nat: Number of atoms
 TBLITE_API_ENTRY void TBLITE_API_CALL
-    tblite_get_result_fock_matrix_gradient(tblite_error error,
-                                           tblite_result res,
-                                           double* fmatgrad,
-                                           int nao,
-                                           int nat);
+    tblite_get_result_fock_gradient(tblite_error error,
+                                    tblite_result res,
+                                    double* fmatgrad,
+                                    int nao,
+                                    int nat);
 
 /// Retrieve Hamiltonian matrix gradient from result container
 ///
@@ -267,11 +267,11 @@ TBLITE_API_ENTRY void TBLITE_API_CALL
 /// @param nao: Number of atomic orbitals
 /// @param nat: Number of atoms
 TBLITE_API_ENTRY void TBLITE_API_CALL
-    tblite_get_result_hamiltonian_matrix_gradient(tblite_error error,
-                                                  tblite_result res,
-                                                  double* hmatgrad,
-                                                  int nao,
-                                                  int nat);
+    tblite_get_result_hamiltonian_gradient(tblite_error error,
+                                            tblite_result res,
+                                            double* hmatgrad,
+                                            int nao,
+                                            int nat);
 
 /// Retrieve Overlap matrix gradient from result container
 ///
@@ -281,11 +281,11 @@ TBLITE_API_ENTRY void TBLITE_API_CALL
 /// @param nao: Number of atomic orbitals
 /// @param nat: Number of atoms
 TBLITE_API_ENTRY void TBLITE_API_CALL
-    tblite_get_result_overlap_matrix_gradient(tblite_error error,
-                                              tblite_result res,
-                                              double* smatgrad,
-                                              int nao,
-                                              int nat);
+    tblite_get_result_overlap_gradient(tblite_error error,
+                                        tblite_result res,
+                                        double* smatgrad,
+                                        int nao,
+                                        int nat);
 
 /// Retrieve post processing dictionary from result container
 ///

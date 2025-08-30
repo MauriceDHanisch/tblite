@@ -11,10 +11,10 @@ def compute_H(numbers, positions):
 def compute_dH(numbers, positions):
     calc = Calculator(method="GFN1-xTB", numbers=numbers, positions=positions)
     calc.set("save-integrals", 1)
-    calc.set("save-hamiltonian-matrix-gradient", 1)
+    calc.set("save-h-gradient", 1)
     calc.set("verbosity", 0)
     res = calc.singlepoint()
-    return res.get("hamiltonian-matrix-gradient")  # (nao,nao,nat,3)
+    return res.get("hamiltonian-gradient")  # (nao,nao,nat,3)
 
 def finite_diff_H(numbers, positions, h=1e-3):
     H0 = compute_H(numbers, positions)

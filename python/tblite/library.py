@@ -511,14 +511,14 @@ set_calculator_temperature = context_check(
 set_calculator_save_integrals = context_check(
     lib.tblite_set_calculator_save_integrals
 )
-set_calculator_save_hamiltonian_matrix_gradient = context_check(
-    lib.tblite_set_calculator_save_hamiltonian_matrix_gradient
+set_calculator_save_hamiltonian_gradient = context_check(
+    lib.tblite_set_calculator_save_hamiltonian_gradient
 )
-set_calculator_save_overlap_matrix_gradient = context_check(
-    lib.tblite_set_calculator_save_overlap_matrix_gradient
+set_calculator_save_overlap_gradient = context_check(
+    lib.tblite_set_calculator_save_overlap_gradient
 )
-set_calculator_save_fock_matrix_gradient = context_check(
-    lib.tblite_set_calculator_save_fock_matrix_gradient
+set_calculator_save_fock_gradient = context_check(
+    lib.tblite_set_calculator_save_fock_gradient
 )
 
 
@@ -618,33 +618,33 @@ def calculator_push_back(ctx, calc, cont) -> None:
     lib.tblite_calculator_push_back(ctx, calc, ptr)
 
 
-def get_hamiltonian_matrix_gradient(res) -> np.ndarray:
+def get_hamiltonian_gradient(res) -> np.ndarray:
     """Get the hamiltonian matrix gradient (norb, norb, nat, 3) from the results object."""
     _norb = get_number_of_orbitals(res)
     _nat = get_number_of_atoms(res)
     arr = np.empty((_norb, _norb, _nat, 3), dtype=np.float64, order="F")
-    error_check(lib.tblite_get_result_hamiltonian_matrix_gradient)(
+    error_check(lib.tblite_get_result_hamiltonian_gradient)(
         res, ffi.cast("double*", arr.ctypes.data), _norb, _nat
     )
     return arr
 
-def get_overlap_matrix_gradient(res) -> np.ndarray:
+def get_overlap_gradient(res) -> np.ndarray:
     """Get the overlap matrix gradient (norb, norb, nat, 3) from the results object."""
     _norb = get_number_of_orbitals(res)
     _nat = get_number_of_atoms(res)
     arr = np.empty((_norb, _norb, _nat, 3), dtype=np.float64, order="F")
-    error_check(lib.tblite_get_result_overlap_matrix_gradient)(
+    error_check(lib.tblite_get_result_overlap_gradient)(
         res, ffi.cast("double*", arr.ctypes.data), _norb, _nat
     )
     return arr
 
 
-def get_fock_matrix_gradient(res) -> np.ndarray:
+def get_fock_gradient(res) -> np.ndarray:
     """Get the fock matrix gradient (norb, norb, nat, 3) from the results object."""
     _norb = get_number_of_orbitals(res)
     _nat = get_number_of_atoms(res)
     arr = np.empty((_norb, _norb, _nat, 3), dtype=np.float64, order="F")
-    error_check(lib.tblite_get_result_fock_matrix_gradient)(
+    error_check(lib.tblite_get_result_fock_gradient)(
         res, ffi.cast("double*", arr.ctypes.data), _norb, _nat
     )
     return arr

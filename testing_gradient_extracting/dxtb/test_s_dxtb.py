@@ -123,11 +123,11 @@ positions = np.array([[0.0, 0.0, 0.0],
 calc = Calculator(method="GFN1-xTB", numbers=numbers, positions=positions)
 calc.set("save-integrals", 1)
 calc.set("verbosity", 0)
-calc.set("save-overlap-matrix-gradient", 1)
+calc.set("save-o-gradient", 1)
 res = calc.singlepoint()
 
 S  = res.get("overlap-matrix")
-dS = res.get("overlap-matrix-gradient")  # (nao, nao, nat, 3)
+dS = res.get("overlap-gradient")  # (nao, nao, nat, 3)
 
 # --- numerical check ---
 h = 1e-3  # displacement in same unit as `positions`
