@@ -25,7 +25,7 @@ module tblite_xtb_singlepoint
    use mctc_io, only : structure_type
    use tblite_adjlist, only : adjacency_list, new_adjacency_list
    use tblite_basis_type, only : get_cutoff, basis_type
-   use tblite_blas, only : gemv
+   use tblite_blas, only : gemv, gemm
    use tblite_container, only : container_cache
    use tblite_context, only : context_type, escape
    use tblite_cutoff, only : get_lattice_points
@@ -70,7 +70,8 @@ contains
 
 !> Entry point for performing single point calculation using the xTB calculator
 subroutine xtb_singlepoint(ctx, mol, calc, wfn, accuracy, energy, gradient, sigma, &
-      & verbosity, results, post_process, save_hamiltonian_matrix_gradient, save_overlap_matrix_gradient)
+      & verbosity, results, post_process, save_hamiltonian_matrix_gradient, save_overlap_matrix_gradient, &
+      & save_fock_matrix_gradient)
    !> Calculation context
    type(context_type), intent(inout) :: ctx
    !> Molecular structure data
@@ -96,13 +97,17 @@ subroutine xtb_singlepoint(ctx, mol, calc, wfn, accuracy, energy, gradient, sigm
    logical, intent(in), optional :: save_hamiltonian_matrix_gradient
    !> Flag to save overlap matrix gradient
    logical, intent(in), optional :: save_overlap_matrix_gradient
+   !> Flag to save fock matrix gradient
+   logical, intent(in), optional :: save_fock_matrix_gradient
    
-   logical :: grad, converged, econverged, pconverged, save_hgrad, save_sgrad
+   logical :: grad, converged, econverged, pconverged, save_hgrad, save_sgrad, save_fgrad
    integer :: prlevel
    real(wp) :: econv, pconv, cutoff, elast, nel
    real(wp), allocatable :: energies(:), edisp(:), erep(:), exbond(:), eint(:), eelec(:)
    real(wp), allocatable :: cn(:), dcndr(:, :, :), dcndL(:, :, :), dEdcn(:)
    real(wp), allocatable :: selfenergy(:), dsedcn(:), lattr(:, :), wdensity(:, :, :), grad_before(:, :)
+   real(wp), allocatable :: dH_dR(:, :, :, :)
+
    type(integral_type) :: ints
    type(potential_type) :: pot
    type(container_cache), allocatable :: ccache, dcache, icache, hcache, rcache
@@ -115,6 +120,9 @@ subroutine xtb_singlepoint(ctx, mol, calc, wfn, accuracy, energy, gradient, sigm
    type(container_cache), allocatable :: cache_list(:)
    
    integer :: iscf, spin
+   ! Locals for Mulliken charge fallback
+   integer :: A, mu, nu
+   real(wp) :: popA
 
    call timer%push("total")
 
@@ -130,6 +138,7 @@ subroutine xtb_singlepoint(ctx, mol, calc, wfn, accuracy, energy, gradient, sigm
    grad = present(gradient) .and. present(sigma)
    save_hgrad = present(save_hamiltonian_matrix_gradient) .and. save_hamiltonian_matrix_gradient
    save_sgrad = present(save_overlap_matrix_gradient) .and. save_overlap_matrix_gradient
+   save_fgrad = present(save_fock_matrix_gradient) .and. save_fock_matrix_gradient
 
    allocate(energies(mol%nat), source=0.0_wp)
    allocate(erep(mol%nat), source=0.0_wp)
@@ -212,17 +221,23 @@ subroutine xtb_singlepoint(ctx, mol, calc, wfn, accuracy, energy, gradient, sigm
       call ctx%message(label_electrons // format_string(wfn%nocc, real_format) // " e")
 
    call timer%push("hamiltonian")
-   if (allocated(calc%ncoord)) then
-      allocate(cn(mol%nat))
-      if (grad) then
-         allocate(dcndr(3, mol%nat, mol%nat), dcndL(3, 3, mol%nat))
-      end if
-      call calc%ncoord%get_cn(mol, cn, dcndr, dcndL)
-   end if
+    if (allocated(calc%ncoord)) then
+       allocate(cn(mol%nat))
+       if (grad .or. save_hgrad) then
+          if (.not.allocated(dcndr)) allocate(dcndr(3, mol%nat, mol%nat))
+          if (.not.allocated(dcndL)) allocate(dcndL(3, 3, mol%nat))
+       end if
+       call calc%ncoord%get_cn(mol, cn, dcndr, dcndL)
+    end if
+    if ((grad .or. save_hgrad) .and. .not.allocated(dcndr)) then
+       allocate(dcndr(3, mol%nat, mol%nat), source=0.0_wp)
+    end if
 
-   allocate(selfenergy(calc%bas%nsh), dsedcn(calc%bas%nsh))
-   call get_selfenergy(calc%h0, mol%id, calc%bas%ish_at, calc%bas%nsh_id, cn=cn, &
-      & selfenergy=selfenergy, dsedcn=dsedcn)
+
+    allocate(selfenergy(calc%bas%nsh), dsedcn(calc%bas%nsh))
+    call get_selfenergy(calc%h0, mol%id, calc%bas%ish_at, calc%bas%nsh_id, cn=cn, &
+       & selfenergy=selfenergy, dsedcn=dsedcn)
+
 
    cutoff = get_cutoff(calc%bas, accuracy)
    call get_lattice_points(mol%periodic, mol%lattice, cutoff, lattr)
@@ -280,6 +295,8 @@ subroutine xtb_singlepoint(ctx, mol, calc, wfn, accuracy, energy, gradient, sigm
    end if
    energies(:) = energies + eelec
    energy = sum(energies)
+   
+    ! No charge-chain rule needed for core Hamiltonian matrix gradient
    if (present(results)) then
       results%energies = energies
    end if
@@ -328,12 +345,37 @@ subroutine xtb_singlepoint(ctx, mol, calc, wfn, accuracy, energy, gradient, sigm
       
       ! Store overlap and hamiltonian matrix gradients if requested
       if (present(results)) then
-         if (save_sgrad) then
-            call get_overlap_matrix_gradient(mol, lattr, list, calc%bas, results%overlap_matrix_gradient)
-         end if
-         if (save_hgrad) then
-            call get_hamiltonian_matrix_gradient(mol, lattr, list, calc%bas, calc%h0, selfenergy, &
-               & results%hamiltonian_matrix_gradient)
+          if (save_sgrad) then
+             call get_overlap_matrix_gradient(mol, lattr, list, calc%bas, results%overlap_matrix_gradient)
+          end if
+          if (save_hgrad) then
+             call get_hamiltonian_matrix_gradient(mol, lattr, list, calc%bas, calc%h0, selfenergy, &
+                & dsedcn, wfn%density, wdensity, pot, results%hamiltonian_matrix_gradient, sigma, dEdcn, dcndr)
+          end if
+         ! Fock matrix gradient: compute if the results object expects it
+         if (save_fgrad) then
+            ! Make sure overlap and its gradient are available
+            if (.not.allocated(results%overlap_matrix_gradient)) then
+               call get_overlap_matrix_gradient(mol, lattr, list, calc%bas, results%overlap_matrix_gradient)
+            end if
+            ! S matrix: prefer saved copy; fall back to local integrals
+            if (.not.allocated(results%overlap)) then
+               results%overlap = ints%overlap
+            end if
+
+            ! Build dH/dR needed for MO response (generalized eigenproblem)
+            if (.not.allocated(dH_dR)) then
+               call get_hamiltonian_matrix_gradient(mol, lattr, list, calc%bas, calc%h0, selfenergy, &
+                  & dsedcn, wfn%density, wdensity, pot, dH_dR, sigma, dEdcn, dcndr)
+            end if
+
+            ! Prepare output container
+            if (.not.allocated(results%fock_matrix_gradient)) then
+               allocate(results%fock_matrix_gradient(calc%bas%nao, calc%bas%nao, mol%nat, 3))
+            end if
+
+            ! Build Fock matrix gradient using AO-level tensors and MO response
+            call build_fock_gradient(results%overlap, results%overlap_matrix_gradient, dH_dR, wfn%coeff, wfn%emo, results%fock_matrix_gradient)
          end if
       end if
       
@@ -402,5 +444,116 @@ subroutine xtb_singlepoint(ctx, mol, calc, wfn, accuracy, energy, gradient, sigm
 
 
 end subroutine xtb_singlepoint
+
+!> Build the analytical gradient of the AO Fock matrix F = S*C*E*C^T*S
+!! Includes response of MO coefficients and eigenvalues via
+!! first-order perturbation of the generalized eigenproblem F C = S C E.
+subroutine build_fock_gradient(S, dS_dR, dH_dR, C, E, dF_dR)
+   use mctc_env, only : wp
+   implicit none
+    real(wp), intent(in) :: S(:, :)
+    real(wp), intent(in) :: dS_dR(:, :, :, :)   ! (nao, nao, nat, 3)
+    real(wp), intent(in) :: dH_dR(:, :, :, :)   ! (nao, nao, nat, 3) effective Hamiltonian gradient
+    real(wp), intent(in) :: C(:, :, :)          ! (nao, nao, nspin)
+    real(wp), intent(in) :: E(:, :)             ! (nao, nspin)
+    real(wp), intent(out) :: dF_dR(:, :, :, :)
+
+    integer :: ispin, iatom, ic, nao, nspin, nat
+    integer :: p, q
+    real(wp), allocatable :: A(:, :), CE(:, :), tmp(:, :), left(:, :), right(:, :)
+    real(wp), allocatable :: S_mo(:, :), H_mo(:, :), U(:, :), UE(:, :), M(:, :)
+    real(wp), allocatable :: dA(:, :), Cspin(:, :), Evec(:)
+
+   nat = size(dS_dR, 3)
+   nao = size(S, 1)
+   nspin = size(C, 3)
+   dF_dR = 0.0_wp
+
+    allocate(A(nao, nao), CE(nao, nao), tmp(nao, nao), left(nao, nao), right(nao, nao))
+    allocate(S_mo(nao, nao), H_mo(nao, nao), U(nao, nao), UE(nao, nao), M(nao, nao))
+    allocate(dA(nao, nao), Cspin(nao, nao), Evec(nao))
+
+   do ispin = 1, nspin
+       ! Spin-specific views
+       Cspin(:, :) = C(:, :, ispin)
+       Evec(:)     = E(:, ispin)
+
+       ! A = C * diag(E) * C^T
+       CE(:, :) = Cspin
+       do ic = 1, nao
+          CE(:, ic) = CE(:, ic) * Evec(ic)
+       end do
+       call gemm(CE, Cspin, A, transb='t')
+
+       ! Precompute S*A and A*S for the dS contributions
+       call gemm(S, A, left)   ! left = S * A
+       call gemm(A, S, right)  ! right = A * S
+
+       do iatom = 1, nat
+          do ic = 1, 3
+             ! 1) dS terms: dS*A*S + S*A*dS
+             call gemm(dS_dR(:, :, iatom, ic), right, tmp)
+             dF_dR(:, :, iatom, ic) = dF_dR(:, :, iatom, ic) + tmp
+             call gemm(left, dS_dR(:, :, iatom, ic), tmp)
+             dF_dR(:, :, iatom, ic) = dF_dR(:, :, iatom, ic) + tmp
+
+             ! 2) MO-response terms: S * (dA) * S
+             ! Transform dS and dH to MO basis
+             call gemm(Cspin, dS_dR(:, :, iatom, ic), tmp, transa='t')   ! tmp = C^T dS
+             call gemm(tmp, Cspin, S_mo)                                 ! S_mo = C^T dS C
+
+             call gemm(Cspin, dH_dR(:, :, iatom, ic), tmp, transa='t')   ! tmp = C^T dH
+             call gemm(tmp, Cspin, H_mo)                                 ! H_mo = C^T dH C
+
+             ! Build U (orbital rotation) and dE in MO basis
+             U(:, :)  = 0.0_wp
+             UE(:, :) = 0.0_wp
+             M(:, :)  = 0.0_wp
+
+             do p = 1, nao
+                ! Diagonal: dE_p = H_mo(p,p) - E_p * S_mo(p,p)
+                M(p, p) = H_mo(p, p) - Evec(p) * S_mo(p, p)
+             end do
+
+             do p = 1, nao
+                do q = 1, nao
+                   if (p == q) cycle
+                   U(q, p) = (H_mo(q, p) - Evec(p) * S_mo(q, p)) / (Evec(p) - Evec(q))
+                end do
+             end do
+             ! Ensure normalization gauge on the diagonal
+             do p = 1, nao
+                U(p, p) = -0.5_wp * S_mo(p, p)
+             end do
+
+             ! UE = U * diag(E)
+             UE(:, :) = 0.0_wp
+             do q = 1, nao
+                do p = 1, nao
+                   UE(p, q) = U(p, q) * Evec(q)
+                end do
+             end do
+
+             ! M = UE + UE^T + diag(dE)
+             do p = 1, nao
+                do q = 1, nao
+                   M(p, q) = M(p, q) + UE(p, q) + UE(q, p)
+                end do
+             end do
+
+             ! dA_AO = C * M * C^T
+             call gemm(Cspin, M, tmp)
+             call gemm(tmp, Cspin, dA, transb='t')
+
+             ! Add S * dA * S
+             call gemm(S, dA, tmp)
+             call gemm(tmp, S, dA)
+             dF_dR(:, :, iatom, ic) = dF_dR(:, :, iatom, ic) + dA
+          end do
+       end do
+   end do
+
+    deallocate(A, CE, tmp, left, right, S_mo, H_mo, U, UE, M, dA, Cspin, Evec)
+end subroutine build_fock_gradient
 
 end module tblite_xtb_singlepoint

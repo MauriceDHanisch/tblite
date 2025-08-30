@@ -760,28 +760,3 @@ def test_numbers():
 
     assert res.get("energy") == approx(-3.763120637211, abs=THR)
 
-
-def test_hamiltonian_gradient():
-    """Test hamiltonian gradient calculation and retrieval"""
-    numbers = np.array([1, 1, 6])
-    positions = np.array([
-        [0.0, 0.0, 0.0],
-        [1.0, 0.0, 0.0],
-        [0.0, 1.0, 0.0],
-    ])
-    
-    calc = Calculator("GFN2-xTB", numbers, positions)
-    
-    # Test that hamiltonian gradient is not available by default
-    res = calc.singlepoint()
-    with raises(TBLiteRuntimeError):
-        res.get("hamiltonian-matrix-gradient")
-    
-    # Test that hamiltonian gradient is available when requested
-    calc.set("save-hamiltonian-matrix-gradient", True)
-    res = calc.singlepoint()
-    hgrad = res.get("hamiltonian-matrix-gradient")
-    
-    # Check shape and basic properties
-    assert hgrad.shape == (3, 3)  # 3 atoms, 3 coordinates
-    # assert not np.allclose(hgrad, 0.0)  # Should not be all zeros

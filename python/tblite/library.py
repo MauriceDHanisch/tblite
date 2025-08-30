@@ -517,6 +517,9 @@ set_calculator_save_hamiltonian_matrix_gradient = context_check(
 set_calculator_save_overlap_matrix_gradient = context_check(
     lib.tblite_set_calculator_save_overlap_matrix_gradient
 )
+set_calculator_save_fock_matrix_gradient = context_check(
+    lib.tblite_set_calculator_save_fock_matrix_gradient
+)
 
 
 @context_check
@@ -631,6 +634,17 @@ def get_overlap_matrix_gradient(res) -> np.ndarray:
     _nat = get_number_of_atoms(res)
     arr = np.empty((_norb, _norb, _nat, 3), dtype=np.float64, order="F")
     error_check(lib.tblite_get_result_overlap_matrix_gradient)(
+        res, ffi.cast("double*", arr.ctypes.data), _norb, _nat
+    )
+    return arr
+
+
+def get_fock_matrix_gradient(res) -> np.ndarray:
+    """Get the fock matrix gradient (norb, norb, nat, 3) from the results object."""
+    _norb = get_number_of_orbitals(res)
+    _nat = get_number_of_atoms(res)
+    arr = np.empty((_norb, _norb, _nat, 3), dtype=np.float64, order="F")
+    error_check(lib.tblite_get_result_fock_matrix_gradient)(
         res, ffi.cast("double*", arr.ctypes.data), _norb, _nat
     )
     return arr

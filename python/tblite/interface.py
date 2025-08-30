@@ -248,6 +248,7 @@ class Result:
         "hamiltonian-matrix": library.get_hamiltonian_matrix,
         "hamiltonian-matrix-gradient": library.get_hamiltonian_matrix_gradient,
         "fock-matrix": library.get_fock_matrix,
+        "fock-matrix-gradient": library.get_fock_matrix_gradient,
         "post-processing-dict": library.get_post_processing_dict,
         "natoms": library.get_number_of_atoms,
         "norbitals": library.get_number_of_orbitals,
@@ -488,6 +489,7 @@ class Calculator(Structure):
         "save-integrals": library.set_calculator_save_integrals,
         "save-hamiltonian-matrix-gradient": library.set_calculator_save_hamiltonian_matrix_gradient,
         "save-overlap-matrix-gradient": library.set_calculator_save_overlap_matrix_gradient,
+            "save-fock-matrix-gradient": library.set_calculator_save_fock_matrix_gradient,
         "temperature": library.set_calculator_temperature,
         "verbosity": library.set_calculator_verbosity,
     }
@@ -556,6 +558,8 @@ class Calculator(Structure):
          mixer-damping     Parameter for the SCC mixer          0.4
          save-integrals    Keep integral matrices in results    0 (False)
          save-hamiltonian-matrix-gradient Keep hamiltonian matrix gradient in results 0 (False)
+          save-overlap-matrix-gradient Keep overlap matrix gradient in results 0 (False)
+          save-fock-matrix-gradient Keep fock matrix gradient in results 0 (False)
          temperature       Electronic temperature for filling   9.500e-4
          verbosity         Set verbosity of printout            1
         ================= ==================================== =================

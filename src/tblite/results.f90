@@ -39,6 +39,8 @@ module tblite_results
       real(wp), allocatable :: overlap_matrix_gradient(:, :, :, :)
       !> Hamiltonian matrix gradient (optional, shape: nao, nao, nat, 3)
       real(wp), allocatable :: hamiltonian_matrix_gradient(:, :, :, :)
+      !> Fock matrix gradient (optional, shape: nao, nao, nat, 3)
+      real(wp), allocatable :: fock_matrix_gradient(:, :, :, :)
       type(double_dictionary_type), allocatable :: dict
    end type results_type
 
