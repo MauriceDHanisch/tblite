@@ -620,8 +620,6 @@ subroutine get_hamiltonian_matrix_gradient(mol, trans, list, bas, h0, selfenergy
                      pref = 0.5_wp * (dsedcn(is+ish) + dsedcn(is+jsh))
                      dHdr(jj+jao, ii+iao, kat, :) = dHdr(jj+jao, ii+iao, kat, :) &
                         + stmp(ij) * pref * dcndr(:, kat, iat)
-                     dHdr(ii+iao, jj+jao, kat, :) = dHdr(ii+iao, jj+jao, kat, :) &
-                        + stmp(ij) * pref * dcndr(:, kat, iat)
                   end do
 
                end do
