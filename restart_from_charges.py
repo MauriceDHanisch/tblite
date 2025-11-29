@@ -74,6 +74,23 @@ def run_spin_polarized():
         [0.0, 0.0,  1.1],
     ], dtype=float)
 
+    # numbers = np.array([6, 6, 7, 7, 1, 1, 1, 1, 1, 1, 8, 8])
+    # positions = np.array([
+    #     [-3.81469488143921, +0.09993441402912, 0.00000000000000],
+    #     [+3.81469488143921, -0.09993441402912, 0.00000000000000],
+    #     [-2.66030049324036, -2.15898251533508, 0.00000000000000],
+    #     [+2.66030049324036, +2.15898251533508, 0.00000000000000],
+    #     [-0.73178529739380, -2.28237795829773, 0.00000000000000],
+    #     [-5.89039325714111, -0.02589114569128, 0.00000000000000],
+    #     [-3.71254944801331, -3.73605775833130, 0.00000000000000],
+    #     [+3.71254944801331, +3.73605775833130, 0.00000000000000],
+    #     [+0.73178529739380, +2.28237795829773, 0.00000000000000],
+    #     [+5.89039325714111, +0.02589114569128, 0.00000000000000],
+    #     [-2.74426102638245, +2.16115570068359, 0.00000000000000],
+    #     [+2.74426102638245, -2.16115570068359, 0.00000000000000],
+    # ])
+
+
     # Enable spin polarization via interaction
     calc = Calculator("GFN2-xTB", numbers, positions, uhf=1)
     calc.add("spin-polarization", 1.0)
@@ -104,6 +121,19 @@ def run_spin_polarized():
     print("\n[Spin] Comparison between full calculation and shell-charges restart:")
     print("Energy difference:", e_diff_qsh)
     print("Maximum force difference:", f_diff_qsh)
+
+    # True restart using full wavefunction (copy Result)
+    res_restart_wfn = Result(res_full)
+    res_restart_wfn = calc.singlepoint(res_restart_wfn)
+    energy_restart_wfn = res_restart_wfn.get("energy")
+    forces_restart_wfn = -res_restart_wfn.get("gradient")
+
+    e_diff_wfn = abs(float(energy_full) - float(energy_restart_wfn))
+    f_diff_wfn = np.max(np.abs(forces_full - forces_restart_wfn))
+
+    print("\n[Spin] Comparison between full calculation and wavefunction restart:")
+    print("Energy difference:", e_diff_wfn)
+    print("Maximum force difference:", f_diff_wfn)
 
 
 if __name__ == "__main__":
